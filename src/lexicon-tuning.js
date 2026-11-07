@@ -1,6 +1,7 @@
 // Ajustement des lexiques à partir de votes humains (comparaison mots-clés / LLM).
 // Entrée : lignes { i, sentence, lex, llm, vote } (format de l'export JSON). Fonctions pures, hors setLexicon/evaluate.
-import { explainSentence, tokenize, analyzeWindow, setLexicon, getLexiconOverrides, mergeOverrides, LEX_CATEGORIES } from './analyzer.js';
+import { explainSentence, tokenize, analyzeWindow, setLexicon, getLexiconOverrides, mergeOverrides, LEX_CATEGORIES, detectPlace, placeMatches } from './analyzer.js';
+import { PLACES } from './places.js';
 
 const STOP = new Set(('dans avec pour sans sous sur par que qui quoi dont mais donc car comme elle elles ils eux nous vous leur leurs cette cet ces son sa ses ' +
   'une des les aux est sont etait etaient avait avaient fait faire plus tout tous toute tres puis alors aussi encore meme quand apres avant entre vers chez ' +
@@ -47,7 +48,27 @@ export function suggestLexicon(rows, { minSupport = 2, gap = 0.2 } = {}) {
   const inAgree = countIn(agree, (r) => candidates(r.sentence, []));
   const inAgreeStem = countIn(agree, (r) => Object.values(explainSentence(r.sentence)).flat());
 
-  const out = { add: [], remove: [] };
+  // ---- lieux : le LLM situe la phrase ailleurs que le motif de mots-clés ----
+  const pAdd = new Map(), pRem = new Map();
+  for (const r of wrong) {
+    const lp = r.lex.place ?? null, bp = r.llm.place ?? null;
+    if (lp === bp) continue;
+    if (bp && PLACES[bp]) for (const c of candidates(r.sentence, placeMatches(r.sentence, bp))) bump(pAdd, `${bp}|${c}`, r.i);
+    if (lp) for (const w of placeMatches(r.sentence, lp)) bump(pRem, `${lp}|${w}`, r.i);
+  }
+  const agreePlace = rows.filter((r) => (r.lex.place ?? null) === (r.llm.place ?? null));
+  const placeWords = countIn(agreePlace, (r) => candidates(r.sentence, []));
+  const placeHits = countIn(agreePlace, (r) => Object.keys(PLACES).flatMap((id) => placeMatches(r.sentence, id)));
+
+  const out = { add: [], remove: [], placeAdd: [], placeRemove: [] };
+  for (const [key, e] of pAdd) {
+    const [place, stem] = key.split('|');
+    if (e.n >= minSupport && (placeWords.get(stem) ?? 0) <= e.n / 2) out.placeAdd.push({ place, stem, support: e.n, rows: e.rows });
+  }
+  for (const [key, e] of pRem) {
+    const [place, word] = key.split('|');
+    if (e.n >= minSupport && (placeHits.get(word) ?? 0) < e.n) out.placeRemove.push({ place, word, support: e.n, rows: e.rows });
+  }
   for (const [key, e] of add) {
     const [cat, stem] = key.split('|');
     if (e.n >= minSupport && (inAgree.get(stem) ?? 0) <= e.n / 2) out.add.push({ cat, stem, support: e.n, rows: e.rows });
@@ -57,14 +78,16 @@ export function suggestLexicon(rows, { minSupport = 2, gap = 0.2 } = {}) {
     if (e.n >= minSupport && (inAgreeStem.get(stem) ?? 0) < e.n) out.remove.push({ cat, stem, support: e.n, rows: e.rows });
   }
   const bySupport = (a, b) => b.support - a.support || a.stem.localeCompare(b.stem);
-  out.add.sort(bySupport); out.remove.sort(bySupport);
+  out.add.sort(bySupport); out.remove.sort(bySupport); out.placeAdd.sort(bySupport); out.placeRemove.sort(bySupport);
   return out;
 }
 
 export function toOverrides(suggestions) {
-  const o = { add: {}, remove: {} };
-  for (const s of suggestions.add) (o.add[s.cat] ??= []).push(s.stem);
-  for (const s of suggestions.remove) (o.remove[s.cat] ??= []).push(s.stem);
+  const o = { add: {}, remove: {}, places: { add: {}, remove: {} } };
+  for (const s of suggestions.add ?? []) (o.add[s.cat] ??= []).push(s.stem);
+  for (const s of suggestions.remove ?? []) (o.remove[s.cat] ??= []).push(s.stem);
+  for (const s of suggestions.placeAdd ?? []) (o.places.add[s.place] ??= []).push(s.stem);
+  for (const s of suggestions.placeRemove ?? []) (o.places.remove[s.place] ??= []).push(s.word);
   return o;
 }
 
@@ -78,6 +101,7 @@ export function evaluateOverrides(rows, candidate) {
       n: s.length,
       tensionMAE: s.length ? s.reduce((t, x) => t + Math.abs(x.a.tension - x.r.llm.tension), 0) / s.length : null,
       valenceAgree: s.length ? s.filter((x) => x.a.valence === x.r.llm.valence).length / s.length : null,
+      placeAgree: set.length ? set.filter((r) => (detectPlace(r.sentence) ?? null) === (r.llm.place ?? null)).length / set.length : null,
     };
   };
   const voted = rows.filter((r) => r.vote), held = rows.filter((r) => !r.vote);

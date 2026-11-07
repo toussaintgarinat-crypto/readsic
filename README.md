@@ -44,6 +44,16 @@ Garde-fous : un mot n'est proposé que s'il explique l'erreur dans au moins N ph
 
 Limite : avec peu de votes (quelques phrases), le support minimum filtre presque tout ; l'outil est fait pour être alimenté par plusieurs textes. Il corrige des mots, pas la syntaxe (négations, ironie) : pour cela, le LLM reste nécessaire.
 
+Les lieux suivent la même logique : quand le LLM situe une phrase ailleurs que les mots-clés, l'outil propose d'**ajouter** un mot au motif du lieu (ex. « fondrière » → Marécage) ou d'en **retirer** un qui déclenche à tort (ex. « brume » dans une phrase de ville). L'accord de lieu est mesuré avant/après comme le reste.
+
+## Son
+
+Instruments synthétisés (Web Audio), sans fichier à charger :
+- **pluck** : corde pincée de Karplus-Strong (`src/synth.js`, hauteur vérifiée par test) ; **bell** : cloche FM à indice décroissant ; **flute** : sinus + souffle filtré + vibrato qui s'installe ; **strings** : trois dents de scie désaccordées, filtre qui s'ouvre ; **brass** : attaque cuivrée (filtre qui s'ouvre puis se referme) ;
+- placement stéréo aléatoire léger, humanisation du timing et des vélocités, niveaux équilibrés entre instruments.
+
+**Vos propres échantillons** (facultatif, `samples/README.md`) : un fichier d'une seule note par instrument + `samples/manifest.json` ; le moteur le transpose et retombe sur la synthèse si le fichier manque. Je n'embarque aucun échantillon : les sons doivent venir de vos enregistrements ou d'une banque dont vous maîtrisez la licence.
+
 ## Mode 2 — cinématographique (`src/storyboard.js`)
 
 « Composer (analyse globale) » lit tout le texte et construit un plan, phrase par phrase :
@@ -82,6 +92,6 @@ forêt → marécage → poursuite (tension, modulation en V) → taverne → r�
 
 ## Limites connues / suite
 - Analyse par mots-clés : fragile (négations, ironie, anglais partiel) ; l'analyse LLM la remplace quand un fournisseur est configuré. Le LLM n'a pas été testé contre une vraie API dans ce dépôt, seulement contre des serveurs simulés (`test/server.test.mjs`).
-- Synthèse simple (oscillateurs) : suffisant pour valider la logique, pas pour la qualité finale ; brancher des samples ou un modèle génératif.
+- Synthèse : nettement plus riche qu'au départ mais toujours synthétique ; pour un rendu « studio », fournir des échantillons (voir ci-dessus) ou brancher un modèle génératif. Le réglage a été fait par mesure de niveau, pas à l'oreille : à valider par une écoute.
 - Non exploité : les partitions de positions de tétrades (`position_*.pdf`), utiles seulement pour un futur moteur d'accords/voicings.
 - Mode 2 (analyse globale, storyboard musical, leitmotivs par personnage) non implémenté.

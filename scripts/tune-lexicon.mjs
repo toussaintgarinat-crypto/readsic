@@ -27,13 +27,16 @@ const pct = (x) => (x === null ? '—' : `${Math.round(x * 100)} %`), f = (x) =>
 console.log(`${rows.length} phrases, ${rows.filter((r) => r.vote).length} votes dont ${voted} en faveur du LLM`);
 console.log('\nAjouts :'); for (const s of sug.add) console.log(`  + [${s.cat}] ${s.stem}  (${s.support} phrases : ${s.rows.join(', ')})`);
 console.log('Retraits :'); for (const s of sug.remove) console.log(`  - [${s.cat}] ${s.stem}  (${s.support} phrases : ${s.rows.join(', ')})`);
-if (!sug.add.length && !sug.remove.length) console.log('  (rien de suffisamment étayé — voter sur plus de phrases ou baisser --min-support)');
+console.log('Lieux :');
+for (const s of sug.placeAdd) console.log(`  + [lieu ${s.place}] ${s.stem}  (${s.support} phrases : ${s.rows.join(', ')})`);
+for (const s of sug.placeRemove) console.log(`  - [lieu ${s.place}] ${s.word}  (${s.support} phrases : ${s.rows.join(', ')})`);
+if (![sug.add, sug.remove, sug.placeAdd, sug.placeRemove].some((l) => l.length)) console.log('  (rien de suffisamment étayé — voter sur plus de phrases ou baisser --min-support)');
 for (const [k, l] of [['voted', 'phrases votées (optimiste)'], ['held', 'autres phrases (contrôle)']])
-  console.log(`\n${l} : écart de tension ${f(ev.before[k].tensionMAE)} → ${f(ev.after[k].tensionMAE)} · valence identique au LLM ${pct(ev.before[k].valenceAgree)} → ${pct(ev.after[k].valenceAgree)} (n=${ev.before[k].n})`);
+  console.log(`\n${l} : écart de tension ${f(ev.before[k].tensionMAE)} → ${f(ev.after[k].tensionMAE)} · valence identique au LLM ${pct(ev.before[k].valenceAgree)} → ${pct(ev.after[k].valenceAgree)} · même lieu ${pct(ev.before[k].placeAgree)} → ${pct(ev.after[k].placeAgree)} (n=${ev.before[k].n})`);
 
 if (opts.write) {
   const out = opt('--out', new URL('../src/lexicon-extra.js', import.meta.url).pathname);
   const merged = mergeOverrides(EXTRA, ov);
-  await writeFile(out, `// Ajustements des lexiques issus de vos votes (générés par \`node scripts/tune-lexicon.mjs <votes.json> --write\`).\n// add : racines ajoutées par catégorie ; remove : racines retirées (faux positifs).\nexport const EXTRA = ${JSON.stringify(merged, null, 2)};\n`);
+  await writeFile(out, `// Ajustements des lexiques issus de vos votes (générés par \`node scripts/tune-lexicon.mjs <votes.json> --write\`).\n// add / remove : racines ajoutées / retirées par catégorie ; places : mots ajoutés / retirés par lieu.\nexport const EXTRA = ${JSON.stringify(merged, null, 2)};\n`);
   console.log(`\nÉcrit : ${out}`);
 }

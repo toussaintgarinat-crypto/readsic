@@ -1,6 +1,7 @@
 // Test du proxy LLM contre un faux serveur "Messages API" (aucun appel réseau réel).
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import fs from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { createApp, normalizeResults, validateRequest, extractJson } from '../server.mjs';
 import { providerFromEnv, openaiCompatibleProvider } from '../providers.mjs';
@@ -65,6 +66,17 @@ assert.equal((await fetch(base + '/src/app.js')).status, 200);
 assert.equal((await fetch(base + '/server.mjs')).status, 404);
 assert.equal((await fetch(base + '/package.json')).status, 404);
 assert.equal((await fetch(base + '/src/../server.mjs')).status, 404);
+
+// échantillons : seul le dossier samples/ (manifeste + fichiers audio) est servi
+assert.equal((await fetch(base + '/samples/manifest.json')).status, 404, 'absent par défaut');
+assert.equal((await fetch(base + '/samples/notes.txt')).status, 404);
+assert.equal((await fetch(base + '/samples/../server.mjs')).status, 404);
+assert.equal((await fetch(base + '/samples/manifest.example.json')).status, 404, "l'exemple n'est pas servi");
+fs.writeFileSync(new URL('../samples/manifest.json', import.meta.url), '{}'); fs.writeFileSync(new URL('../samples/test_note.wav', import.meta.url), 'RIFF');
+try {
+  const m = await fetch(base + '/samples/manifest.json'); assert.equal(m.status, 200); assert.match(m.headers.get('content-type'), /json/);
+  const w = await fetch(base + '/samples/test_note.wav'); assert.equal(w.status, 200); assert.equal(w.headers.get('content-type'), 'audio/wav');
+} finally { fs.unlinkSync(new URL('../samples/manifest.json', import.meta.url)); fs.unlinkSync(new URL('../samples/test_note.wav', import.meta.url)); }
 
 // sans clé : santé = false, analyse = 503
 const saved = { k: process.env.ANTHROPIC_API_KEY, t: process.env.ANTHROPIC_AUTH_TOKEN };

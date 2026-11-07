@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/analyzer.test.mjs && node test/storyboard.test.mjs && node test/server.test.mjs && node test/compare.test.mjs && node test/tuning.test.mjs"
+    "test": "node test/analyzer.test.mjs && node test/storyboard.test.mjs && node test/server.test.mjs && node test/compare.test.mjs && node test/tuning.test.mjs && node test/synth.test.mjs"
   },
   "license": "MIT",
   "dependencies": {

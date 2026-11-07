@@ -207,7 +207,10 @@ function exportVotes() {
 function renderTuning() {
   const box = $('cmp-tuning'), minSupport = Math.max(1, Number($('cmp-minsup').value) || 2);
   const sug = suggestLexicon(voteRows, { minSupport });
-  const items = [...sug.add.map((s) => ({ ...s, kind: 'add' })), ...sug.remove.map((s) => ({ ...s, kind: 'remove' }))];
+  const items = [
+    ...sug.add.map((s) => ({ ...s, kind: 'add' })), ...sug.remove.map((s) => ({ ...s, kind: 'remove' })),
+    ...sug.placeAdd.map((s) => ({ ...s, kind: 'placeAdd' })), ...sug.placeRemove.map((s) => ({ ...s, kind: 'placeRemove' })),
+  ];
   box.hidden = false; box.innerHTML = '';
   const votesLlm = voteRows.filter((r) => r.vote === 'llm').length;
   if (!items.length) {
@@ -217,20 +220,23 @@ function renderTuning() {
     return;
   }
   const head = document.createElement('div'); head.className = 'muted';
-  head.textContent = `Propositions déduites de ${votesLlm} vote(s) « LLM » — décochez ce qui vous paraît faux :`;
+  head.textContent = `Propositions déduites de ${votesLlm} vote(s) « LLM » (mots-clés et lieux) — décochez ce qui vous paraît faux :`;
   const ul = document.createElement('ul'), evalDiv = document.createElement('div'); evalDiv.className = 'muted';
   const checks = items.map((it) => {
     const li = document.createElement('li'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true;
     const ex = it.rows.slice(0, 2).map((i) => `« ${sentences[i].slice(0, 40)}… »`).join(', ');
-    li.append(cb, ` ${it.kind === 'add' ? '+ ajouter' : '− retirer'} `);
-    const code = document.createElement('code'); code.textContent = it.stem; li.append(code, ` → ${it.cat} (${it.support} phrases : ${ex})`);
+    const plus = it.kind === 'add' || it.kind === 'placeAdd', isPlace = it.kind.startsWith('place');
+    li.append(cb, ` ${plus ? '+ ajouter' : '− retirer'} `);
+    const code = document.createElement('code'); code.textContent = it.stem ?? it.word;
+    li.append(code, isPlace ? ` → lieu « ${PLACES[it.place].name} » (${it.support} phrases : ${ex})` : ` → ${it.cat} (${it.support} phrases : ${ex})`);
     cb.onchange = refresh; ul.appendChild(li); return { cb, it };
   });
-  const selected = () => toOverrides({ add: checks.filter((c) => c.cb.checked && c.it.kind === 'add').map((c) => c.it), remove: checks.filter((c) => c.cb.checked && c.it.kind === 'remove').map((c) => c.it) });
+  const pick = (kind) => checks.filter((c) => c.cb.checked && c.it.kind === kind).map((c) => c.it);
+  const selected = () => toOverrides({ add: pick('add'), remove: pick('remove'), placeAdd: pick('placeAdd'), placeRemove: pick('placeRemove') });
   function refresh() {
     const ev = evaluateOverrides(voteRows, selected());
     const f = (x) => (x === null ? '—' : x.toFixed(2)), p = (x) => (x === null ? '—' : `${Math.round(x * 100)} %`);
-    const line = (k, l) => `${l} (n=${ev.before[k].n}) : écart de tension ${f(ev.before[k].tensionMAE)} → ${f(ev.after[k].tensionMAE)}, valence identique ${p(ev.before[k].valenceAgree)} → ${p(ev.after[k].valenceAgree)}`;
+    const line = (k, l) => `${l} (n=${ev.before[k].n}) : écart de tension ${f(ev.before[k].tensionMAE)} → ${f(ev.after[k].tensionMAE)}, valence identique ${p(ev.before[k].valenceAgree)} → ${p(ev.after[k].valenceAgree)}, même lieu ${p(ev.before[k].placeAgree)} → ${p(ev.after[k].placeAgree)}`;
     evalDiv.innerHTML = '';
     for (const [k, l] of [['voted', 'Phrases votées, optimiste car elles ont servi à ajuster'], ['held', 'Autres phrases, contrôle hors échantillon']]) { const d = document.createElement('div'); d.textContent = line(k, l); evalDiv.appendChild(d); }
   }

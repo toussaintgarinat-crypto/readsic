@@ -59,7 +59,35 @@ assert.ok(lex('Le gouffre béant.').tension > t0);
 assert.ok(!explainSentence('Il garda son sang-froid.').tension?.includes('sang'));
 setLexicon({});
 assert.equal(lex('Le gouffre béant.').tension, t0);
-assert.deepEqual(mergeOverrides({ add: { tension: ['a'] } }, { add: { tension: ['a', 'b'] }, remove: { calm: ['c'] } }), { add: { tension: ['a', 'b'] }, remove: { calm: ['c'] } });
+assert.deepEqual(mergeOverrides({ add: { tension: ['a'] } }, { add: { tension: ['a', 'b'] }, remove: { calm: ['c'] } }), { add: { tension: ['a', 'b'] }, remove: { calm: ['c'] }, places: { add: {}, remove: {} } });
+
+// ---- lieux ----
+import { detectPlace } from '../src/analyzer.js';
+const P = (place) => ({ tension: 0.1, valence: 'neutre', movement: 0.3, place });
+const prow = (i, sentence, place, vote = null) => ({ i, sentence, lex: { ...lex(sentence), place: detectPlace(sentence) }, llm: P(place), vote });
+const prows = [
+  prow(0, 'La fondrière s\'étendait à perte de vue.', 'marais', 'llm'),      // lieu non reconnu par les mots-clés
+  prow(1, 'Ils contournèrent la fondrière en silence.', 'marais', 'llm'),
+  prow(2, 'La brume du matin couvrait la ville.', null, 'llm'),               // faux positif : « brume » ≠ marécage ici
+  prow(3, 'Une brume légère flottait sur les toits.', null, 'llm'),
+  prow(4, 'Le marécage dormait sous la lune.', 'marais'),                     // accord
+  prow(5, 'La taverne était pleine.', 'taverne'),
+];
+assert.equal(prows[0].lex.place, null); assert.equal(prows[2].lex.place, 'marais');
+const ps = suggestLexicon(prows);
+assert.ok(ps.placeAdd.some((x) => x.place === 'marais' && x.stem.startsWith('fondri') && x.support === 2), JSON.stringify(ps.placeAdd));
+assert.ok(!ps.placeAdd.some((x) => /ville|silence|toits/.test(x.stem)), 'mots sans lien écartés');
+assert.ok(ps.placeRemove.some((x) => x.place === 'marais' && x.word === 'brume' && x.support === 2), JSON.stringify(ps.placeRemove));
+const pov = toOverrides(ps);
+assert.ok(pov.places.add.marais && pov.places.remove.marais.includes('brume'));
+const pev = evaluateOverrides(prows, pov);
+assert.ok(pev.after.voted.placeAgree > pev.before.voted.placeAgree, 'accord de lieu amélioré sur les phrases votées');
+assert.equal(pev.before.voted.placeAgree, 0); assert.equal(pev.after.voted.placeAgree, 1);
+setLexicon(pov);
+assert.equal(detectPlace('Une fondrière sans fond.'), 'marais'); assert.equal(detectPlace('La brume sur la ville.'), null);
+assert.equal(detectPlace('Brume sur le marécage.'), 'marais', 'un autre mot du motif suffit encore');
+setLexicon({});
+assert.equal(detectPlace('La brume sur la ville.'), 'marais', 'réinitialisation');
 
 // CLI de bout en bout
 const dir = await mkdtemp(path.join(tmpdir(), 'tune-'));
@@ -68,6 +96,7 @@ await writeFile(votes, JSON.stringify({ version: 1, rows }));
 const stdout = execFileSync('node', ['scripts/tune-lexicon.mjs', votes, '--write', '--out', out], { encoding: 'utf8' });
 assert.match(stdout, /\+ \[tension\] gouffr/); assert.match(stdout, /- \[tension\] sang/);
 const written = await import(out + '?' + Date.now());
+assert.deepEqual(written.EXTRA.places, { add: {}, remove: {} }, 'format complet même sans suggestion de lieu');
 assert.deepEqual(written.EXTRA.add.tension, ['gouffr']); assert.deepEqual(written.EXTRA.remove.tension, ['sang']);
 assert.match(await readFile(out, 'utf8'), /export const EXTRA/);
 console.log('OK — tuning');

@@ -15,8 +15,8 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 export const VALENCES = ['neutre', 'joyeux', 'festif', 'melancolique', 'menacant', 'tragique', 'onirique', 'exotique', 'angoissant'];
 export const PLACE_IDS = ['marais', 'taverne', 'foret', 'cite', 'mer', 'chateau', 'grotte', 'desert'];
 const MAX_SENTENCES = 16, MAX_CHARS = 12000, MAX_BODY = 64 * 1024;
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
-const STATIC = /^\/(index\.html|style\.css|src\/[\w.-]+\.js)$/;
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.flac': 'audio/flac' };
+const STATIC = /^\/(index\.html|style\.css|src\/[\w.-]+\.js|samples\/manifest\.json|samples\/[\w-]+(?:\.[\w-]+)*\.(?:wav|mp3|ogg|flac))$/;
 
 const SYSTEM = `Tu annotes un texte narratif, phrase par phrase, pour piloter une bande originale adaptative.
 Pour chaque phrase numérotée, donne :

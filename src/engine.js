@@ -1,6 +1,7 @@
 // Moteur de synthèse Web Audio : scènes par lieu (crossfade) + couche de tension globale.
 import { PLACES, MODES, VALENCE_MODE } from './places.js';
 import { mulberry32, seedOf, makeMotif } from './motif.js';
+import { karplusStrong } from './synth.js';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 
@@ -25,6 +26,9 @@ export class MusicEngine {
     this.master.gain.value = this.volume;
     const comp = ctx.createDynamicsCompressor();
     this.master.connect(comp).connect(ctx.destination);
+    this.analyser = ctx.createAnalyser(); this.analyser.fftSize = 2048; comp.connect(this.analyser); // mesure de niveau (tests, indicateurs)
+    this.pluckCache = new Map();
+    this.loadSamples(); // facultatif : remplace la synthèse d'un instrument si un échantillon est fourni
 
     // Réverbération (réponse impulsionnelle bruitée) partagée.
     this.reverb = ctx.createConvolver();
@@ -37,6 +41,30 @@ export class MusicEngine {
 
     this.buildTensionLayer();
     this.timer = setInterval(() => this.tick(), 100);
+  }
+
+  // Niveau RMS instantané de la sortie (0..1).
+  level() {
+    if (!this.analyser) return 0;
+    const buf = new Float32Array(this.analyser.fftSize); this.analyser.getFloatTimeDomainData(buf);
+    return Math.sqrt(buf.reduce((t, x) => t + x * x, 0) / buf.length);
+  }
+
+  // Échantillons facultatifs : samples/manifest.json = { "flute": { "file": "flute_C4.wav", "baseHz": 261.63, "gain": 1 }, … }
+  // Un instrument sans échantillon (ou en échec de chargement) reste synthétisé.
+  async loadSamples() {
+    this.samples = {};
+    try {
+      const r = await fetch('samples/manifest.json'); if (!r.ok) return;
+      const man = await r.json();
+      await Promise.all(Object.entries(man).map(async ([inst, m]) => {
+        try {
+          const res = await fetch('samples/' + m.file); if (!res.ok) return;
+          const buffer = await this.ctx.decodeAudioData(await res.arrayBuffer());
+          this.samples[inst] = { buffer, baseHz: m.baseHz, gain: m.gain ?? 1 };
+        } catch { /* échantillon illisible : synthèse */ }
+      }));
+    } catch { /* pas de manifeste */ }
   }
 
   stop() {
@@ -221,30 +249,78 @@ export class MusicEngine {
     g.gain.exponentialRampToValueAtTime(0.0001, time + a + dur + rel);
   }
 
-  playNote(s, inst, f, time, dur, vel) {
-    const ctx = this.ctx, g = ctx.createGain(), end = time + dur + 2.5;
-    const mk = (type, freq, detune = 0) => {
-      const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = detune;
-      o.start(time); o.stop(end); return o;
-    };
-    let oscs = [], filt = null;
-    switch (inst) {
-      case 'flute': {
-        const o = mk('sine', f); const v = ctx.createOscillator(); v.frequency.value = 5;
-        const va = ctx.createGain(); va.gain.value = f * 0.006; v.connect(va).connect(o.frequency); v.start(time); v.stop(end);
-        oscs = [o, mk('triangle', f * 2)]; this.env(g, time, 0.1, vel, dur, 0.6); break;
-      }
-      case 'pluck': oscs = [mk('triangle', f), mk('sine', f * 2)]; this.env(g, time, 0.005, vel, dur * 0.3, 0.4); break;
-      case 'bell': oscs = [mk('sine', f), mk('sine', f * 2.76), mk('sine', f * 5.4)]; this.env(g, time, 0.003, vel * 0.9, dur * 0.8, 1.6); break;
-      case 'strings': oscs = [mk('sawtooth', f, -8), mk('sawtooth', f, 8)]; filt = 900; this.env(g, time, 0.5, vel * 0.5, dur, 1.2); break;
-      case 'brass': oscs = [mk('sawtooth', f), mk('sawtooth', f, 5)]; filt = 1100; this.env(g, time, 0.14, vel * 0.55, dur, 0.5); break;
-      default: oscs = [mk('sine', f)]; this.env(g, time, 0.02, vel, dur, 0.5);
+  // Corde pincée : tampon Karplus-Strong mis en cache (une seule synthèse par hauteur).
+  pluckBuffer(f) {
+    const key = Math.round(f * 2);
+    let e = this.pluckCache.get(key);
+    if (!e) {
+      const { data, nominalHz } = karplusStrong(f, this.ctx.sampleRate, 2.5, { seed: key });
+      const buffer = this.ctx.createBuffer(1, data.length, this.ctx.sampleRate); buffer.copyToChannel(data, 0);
+      e = { buffer, nominalHz }; this.pluckCache.set(key, e);
+      if (this.pluckCache.size > 200) this.pluckCache.delete(this.pluckCache.keys().next().value);
     }
-    let node = g;
-    if (filt) { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = filt; lp.connect(g); node = lp; }
-    oscs.forEach((o) => o.connect(node));
-    g.connect(s.filter);
-    oscs[0].onended = () => g.disconnect();
+    return e;
+  }
+
+  playNote(s, inst, f, time, dur, vel) {
+    const ctx = this.ctx;
+    time = Math.max(ctx.currentTime, time + (Math.random() - 0.5) * 0.02); // légère humanisation
+    vel *= 0.85 + Math.random() * 0.3;
+    const out = ctx.createGain(), pan = ctx.createStereoPanner();
+    pan.pan.value = (Math.random() - 0.5) * 0.8;
+    out.connect(pan).connect(s.filter);
+    const stopAll = [];
+    const osc = (type, freq, detune = 0) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = detune; stopAll.push(o); return o; };
+    const through = (src, gainVal, ...chain) => { const g = ctx.createGain(); g.gain.value = gainVal; let n = src.connect(g); for (const c of chain) n = n.connect(c); n.connect(out); return g; };
+    const env = (a, peak, hold, rel) => { out.gain.setValueAtTime(0.0001, time); out.gain.linearRampToValueAtTime(peak, time + a); out.gain.setValueAtTime(peak, time + a + hold); out.gain.exponentialRampToValueAtTime(0.0001, time + a + hold + rel); return time + a + hold + rel; };
+    let end;
+
+    const smp = this.samples?.[inst];
+    if (smp && f / smp.baseHz > 0.5 && f / smp.baseHz < 2) { // échantillon fourni : hauteur ajustée par playbackRate
+      const src = ctx.createBufferSource(); src.buffer = smp.buffer; src.playbackRate.value = f / smp.baseHz;
+      src.connect(out); out.gain.setValueAtTime(vel * 1.5 * smp.gain, time); out.gain.setTargetAtTime(0.0001, time + dur, 0.4);
+      src.start(time); end = time + dur + 2; src.stop(end); src.onended = () => pan.disconnect(); return;
+    }
+
+    switch (inst) {
+      case 'pluck': { // corde pincée (Karplus-Strong)
+        const { buffer, nominalHz } = this.pluckBuffer(f);
+        const src = ctx.createBufferSource(); src.buffer = buffer; src.playbackRate.value = f / nominalHz;
+        src.connect(out); end = env(0.002, vel * 1.9, dur * 0.4, 1.8); src.start(time); src.stop(end); stopAll.push(src); break;
+      }
+      case 'bell': { // cloche FM : rapport modulateur/porteuse non entier, indice qui retombe
+        const car = osc('sine', f), mod = osc('sine', f * 3.5), mg = ctx.createGain();
+        mg.gain.setValueAtTime(f * 2.5, time); mg.gain.exponentialRampToValueAtTime(f * 0.15, time + 1.8);
+        mod.connect(mg).connect(car.frequency);
+        const partial = osc('sine', f * 2.01); through(partial, 0.25);
+        car.connect(out); end = env(0.003, vel * 0.45, dur * 0.3, 2.2); break;
+      }
+      case 'flute': { // souffle + vibrato qui s'installe après l'attaque
+        const o = osc('sine', f), v = osc('sine', 5.2), va = ctx.createGain();
+        va.gain.setValueAtTime(0, time); va.gain.linearRampToValueAtTime(f * 0.008, time + 0.35);
+        v.connect(va).connect(o.frequency); o.connect(out); through(osc('triangle', f * 2), 0.12);
+        const br = ctx.createBufferSource(); br.buffer = this.noise; br.loop = true;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 2; bp.Q.value = 4;
+        const bg = ctx.createGain(); bg.gain.setValueAtTime(vel * 0.5, time); bg.gain.exponentialRampToValueAtTime(vel * 0.06, time + 0.25);
+        br.connect(bp).connect(bg).connect(out); br.start(time); stopAll.push(br);
+        end = env(0.09, vel * 0.7, dur, 0.5); break;
+      }
+      case 'strings': { // ensemble : 3 dents de scie désaccordées, filtre qui s'ouvre
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
+        lp.frequency.setValueAtTime(600, time); lp.frequency.linearRampToValueAtTime(1900, time + 0.7); lp.frequency.exponentialRampToValueAtTime(800, time + dur + 1);
+        [-11, 0, 11].forEach((d) => { const o = osc('sawtooth', f, d + (Math.random() - 0.5) * 4); through(o, 0.33, lp); });
+        lp.connect(out); end = env(0.55, vel * 1.1, dur, 1.2); break;
+      }
+      case 'brass': { // attaque cuivrée : le filtre s'ouvre vite puis se referme
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2;
+        lp.frequency.setValueAtTime(350, time); lp.frequency.linearRampToValueAtTime(2000, time + 0.12); lp.frequency.exponentialRampToValueAtTime(900, time + 0.6);
+        [0, 6].forEach((d) => through(osc('sawtooth', f, d), 0.5, lp)); lp.connect(out);
+        end = env(0.07, vel * 0.9, dur, 0.5); break;
+      }
+      default: osc('sine', f).connect(out); end = env(0.02, vel, dur, 0.5);
+    }
+    stopAll.forEach((o) => { if (o.start && !o.buffer) o.start(time); if (!o.buffer) o.stop(end + 0.1); });
+    stopAll[0].onended = () => pan.disconnect();
   }
 
   // Leitmotif de personnage : joué une fois, transposé dans la tonalité et le mode courants du lieu.
