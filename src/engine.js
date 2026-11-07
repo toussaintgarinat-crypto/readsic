@@ -26,6 +26,7 @@ export class MusicEngine {
     this.master.gain.value = this.volume;
     const comp = ctx.createDynamicsCompressor();
     this.master.connect(comp).connect(ctx.destination);
+    this.comp = comp;
     this.analyser = ctx.createAnalyser(); this.analyser.fftSize = 2048; comp.connect(this.analyser); // mesure de niveau (tests, indicateurs)
     this.pluckCache = new Map();
     this.loadSamples(); // facultatif : remplace la synthèse d'un instrument si un échantillon est fourni
@@ -41,6 +42,30 @@ export class MusicEngine {
 
     this.buildTensionLayer();
     this.timer = setInterval(() => this.tick(), 100);
+  }
+
+  // Enregistrement de la sortie audio (ce que vous entendez) -> Blob audio (webm/opus).
+  recordStart() {
+    if (!this.ctx || this.recorder) return false;
+    const dest = this.ctx.createMediaStreamDestination();
+    this.comp.connect(dest);
+    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((t) => MediaRecorder.isTypeSupported(t));
+    this.recChunks = []; this.recDest = dest;
+    this.recorder = new MediaRecorder(dest.stream, type ? { mimeType: type } : undefined);
+    this.recorder.ondataavailable = (e) => e.data.size && this.recChunks.push(e.data);
+    this.recorder.start(1000);
+    return true;
+  }
+  recordStop() {
+    const rec = this.recorder; if (!rec) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      rec.onstop = () => {
+        this.comp.disconnect(this.recDest);
+        const blob = new Blob(this.recChunks, { type: rec.mimeType });
+        this.recorder = null; this.recChunks = []; resolve(blob);
+      };
+      rec.stop();
+    });
   }
 
   // Niveau RMS instantané de la sortie (0..1).

@@ -125,7 +125,7 @@ export function analyzeWindow(sentences, i, weights = WEIGHTS, scoreFn = null) {
 // Mots (sans accents, minuscules) par lesquels le motif de base d'un lieu reconnaît la phrase.
 export function placeMatches(sentence, id) {
   const p = PLACES[id]?.pattern; if (!p) return [];
-  return [...sentence.matchAll(new RegExp(p.source, 'gi'))].map((m) => strip(m[0]));
+  return [...sentence.matchAll(new RegExp(p.source, p.flags.includes('g') ? p.flags : p.flags + 'g'))].map((m) => strip(m[0]));
 }
 
 // Lieu mentionné dans la phrase : motif de base, moins les mots retirés, plus les mots ajoutés (votes).

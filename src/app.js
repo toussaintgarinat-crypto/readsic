@@ -3,7 +3,7 @@ import { PLACES, MODES, VALENCE_MODE, VALENCE_LABEL, keyInfo } from './places.js
 import { Modulator } from './modulation.js';
 import { MusicEngine } from './engine.js';
 import { Memory, hashText } from './memory.js';
-import { LlmScores } from './llm-analyzer.js';
+import { LlmScores, normalizeScores } from './llm-analyzer.js';
 import { buildStoryboard } from './storyboard.js';
 import { compareAnalyses, tally } from './compare.js';
 import { detectPlace, setLexicon, mergeOverrides, getLexiconOverrides } from './analyzer.js';
@@ -29,6 +29,7 @@ let mode = 'live';       // 'live' | 'cinema'
 let llmAvailable = false;
 let cmpLlm = null;       // scores LLM utilisés par la comparaison (indépendants de la source d'écoute)
 let llmInfo = null;
+let imported = null;     // analyse importée (JSON) : utilisable sans serveur LLM
 
 // ---- sources d'analyse ------------------------------------------------------
 const detectFn = () => (llm ? (_s, k) => llm.placeAt(k) : null);
@@ -39,7 +40,7 @@ function load(t) {
   text = t;
   sentences = splitSentences(text);
   memory = new Memory(hashText(text));
-  llm = null; sb = null; mode = 'live';
+  llm = null; sb = null; imported = null; mode = 'live';
   $('source').value = 'lex'; $('mode').value = 'live'; $('mode').options[1].disabled = true;
   $('storyboard').hidden = true; $('chars-card').hidden = true; $('compare').hidden = true; cmpLlm = null; $('llm-status').textContent = '—'; $('compose-status').textContent = '';
   current = Math.min(memory.data.position ?? 0, Math.max(0, sentences.length - 1));
@@ -171,13 +172,14 @@ function renderMemory() {
 // ---- LLM (source d'analyse) -------------------------------------------------
 function llmStatus() {
   if (!llm) return;
+  if (llm.imported) { $('llm-status').textContent = `Analyse importée : ${llm.done}/${sentences.length} phrases`; return; }
   $('llm-status').textContent = llm.error ? `LLM : ${llm.error} — repli sur les mots-clés` : `LLM : ${llm.done}/${sentences.length} phrases analysées${llm.running ? '…' : ''}`;
 }
 
 async function setSource(src) {
   if (src === 'llm') {
-    llm = new LlmScores(sentences, { onUpdate: llmStatus });
-    llmStatus(); llm.focus(current); llm.run();
+    llm = imported ?? new LlmScores(sentences, { onUpdate: llmStatus });
+    llmStatus(); llm.focus(current); if (!llm.imported) llm.run();
   } else { llm = null; $('llm-status').textContent = '—'; }
   sb = null; mode = 'live'; $('mode').value = 'live'; $('mode').options[1].disabled = true;
   $('storyboard').hidden = true; $('chars-card').hidden = true; $('compose-status').textContent = '';
@@ -320,7 +322,7 @@ async function compose() {
       const ok = await llm.completeAll(); clearInterval(iv); llmStatus();
       if (!ok) st.textContent = 'LLM indisponible : storyboard composé avec les mots-clés.';
     }
-    sb = buildStoryboard(sentences, sentScore, { detect: detectFn() });
+    sb = buildStoryboard(sentences, sentScore, { detect: detectFn(), characters: $('extra-chars').value.split(',').map((x) => x.trim()).filter(Boolean) });
     const climaxes = sb.chapters.filter((c) => c.climax !== null).length;
     if (!st.textContent.startsWith('LLM indisponible')) st.textContent = `${sb.chapters.length} arcs, ${climaxes} climax, ${sb.characters.length} personnage(s).`;
     $('mode').options[1].disabled = false; $('mode').value = 'cinema'; mode = 'cinema';
@@ -389,10 +391,16 @@ $('start').onclick = async () => {
   await engine.start();
   engine.onTick = null;
   $('start').disabled = true; $('start').textContent = '♪ Audio actif';
-  $('auto').disabled = false;
+  $('auto').disabled = false; $('rec').disabled = false;
   goTo(current, true);
 };
 $('auto').onclick = () => toggleAuto();
+$('rec').onclick = async () => {
+  const b = $('rec');
+  if (!engine.recorder) { if (engine.recordStart()) b.textContent = '■ Arrêter et télécharger'; return; }
+  const blob = await engine.recordStop(); b.textContent = '● Enregistrer';
+  if (blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `readsic-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.webm`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+};
 $('wpm').oninput = (e) => { $('wpmv').textContent = e.target.value; };
 $('vol').oninput = (e) => engine.setVolume(Number(e.target.value) / 100);
 $('clear').onclick = () => { memory.clear(); current = 0; renderMemory(); goTo(0, true); };
@@ -400,6 +408,18 @@ $('load').onclick = () => { const v = $('custom').value.trim(); if (v) { toggleA
 $('source').onchange = (e) => setSource(e.target.value);
 $('mode').onchange = (e) => { mode = e.target.value; goTo(current, true); };
 $('compose').onclick = () => compose();
+$('import').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const obj = JSON.parse(await f.text());
+    imported = new LlmScores(sentences, { onUpdate: llmStatus });
+    imported.import(obj.scores ?? obj);
+    llmInfo = { llm: true, provider: 'import', model: obj.source ?? f.name };
+    llmAvailable = true; $('compare-btn').disabled = false;
+    $('source').options[1].disabled = false; $('source').options[1].textContent = `Analyse importée (${f.name})`;
+    $('source').value = 'llm'; await setSource('llm'); goTo(current, true);
+  } catch (err) { imported = null; $('llm-status').textContent = `Import impossible : ${err.message}`; }
+};
 $('compare-btn').onclick = () => openCompare();
 $('cmp-export').onclick = () => exportVotes();
 $('cmp-tune').onclick = () => renderTuning();
@@ -424,4 +444,4 @@ LlmScores.available().then((h) => {
   if (h.llm) $('source').options[1].textContent = `LLM : ${h.provider} / ${h.model}`;
   $('llm-status').textContent = h.llm ? `Analyse LLM disponible (${h.provider})` : 'Analyse LLM indisponible — configurer un fournisseur (voir README)';
 });
-window.__readsic = { openCompare, getLexiconOverrides, engine, goTo, get memory() { return memory; }, get sb() { return sb; }, compose, setSource, get llm() { return llm; } }; // debug/tests
+window.__readsic = { importScores: (list, name) => { imported = new LlmScores(sentences, { onUpdate: llmStatus }); imported.import(list); llmInfo = { llm: true, provider: 'import', model: name ?? 'import' }; llmAvailable = true; $('compare-btn').disabled = false; $('source').options[1].disabled = false; $('source').value = 'llm'; return setSource('llm'); }, load, openCompare, getLexiconOverrides, engine, goTo, get memory() { return memory; }, get sb() { return sb; }, compose, setSource, get llm() { return llm; } }; // debug/tests

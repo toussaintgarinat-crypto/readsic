@@ -12,6 +12,7 @@
   <div class="controls">
     <button id="start">▶ Lancer l'audio</button>
     <button id="auto" disabled>Lecture auto : off</button>
+    <button id="rec" class="ghost" disabled>● Enregistrer</button>
     <label>Vitesse <input id="wpm" type="range" min="80" max="400" value="200"> <span id="wpmv">200</span> mpm</label>
     <label>Volume <input id="vol" type="range" min="0" max="100" value="70"></label>
   </div>
@@ -48,6 +49,8 @@
         <select id="source"><option value="lex">Mots-clés (local)</option><option value="llm" disabled>LLM (serveur)</option></select>
       </label>
       <div id="llm-status" class="muted">—</div>
+      <label class="row">Analyse importée <input type="file" id="import" accept=".json,application/json"></label>
+      <label class="row">Personnages <input type="text" id="extra-chars" placeholder="loup, chien" size="14"></label>
       <label class="row">Mode
         <select id="mode"><option value="live">1 · Temps réel</option><option value="cinema" disabled>2 · Cinématographique</option></select>
       </label>

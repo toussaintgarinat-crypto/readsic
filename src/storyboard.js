@@ -24,7 +24,7 @@ function smooth(arr, r = 2) {
 // --- Personnages : noms propres (majuscule hors début de phrase, jamais vus en minuscules) ------
 const WORD = /\p{L}[\p{L}'’-]*/gu;
 
-export function detectCharacters(sentences, { minCount = 2, max = 4 } = {}) {
+export function detectCharacters(sentences, { minCount = 2, max = 4, extra = [] } = {}) {
   const lower = new Set(), mid = new Set(), count = new Map();
   const per = sentences.map((s) => {
     const words = s.match(WORD) ?? [];
@@ -48,7 +48,20 @@ export function detectCharacters(sentences, { minCount = 2, max = 4 } = {}) {
       instrument: CHARACTER_INSTRUMENTS[Math.abs(seedOf(k)) % CHARACTER_INSTRUMENTS.length],
     }));
   const ids = new Set(names.map((n) => n.id));
-  return { characters: names, perSentence: per.map((f) => [...new Set(f)].filter((k) => ids.has(k))) };
+  const perSentence = per.map((f) => [...new Set(f)].filter((k) => ids.has(k)));
+  // Personnages déclarés par l'utilisateur (noms communs, minuscules : « loup », « chien »…), pluriels compris.
+  for (const raw of extra) {
+    const id = raw.trim().toLowerCase(); if (!id || ids.has(id)) continue;
+    const re = new RegExp(`(?<![\\p{L}])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:s|x)?(?![\\p{L}])`, 'iu');
+    let count = 0;
+    sentences.forEach((sen, i) => { if (re.test(sen)) { count++; perSentence[i].push(id); } });
+    if (!count) continue;
+    ids.add(id);
+    names.push({ id, name: id[0].toUpperCase() + id.slice(1), count, declared: true,
+      motif: makeMotif('char:' + id, { min: 5, spread: 3, lo: 0, hi: 9 }),
+      instrument: CHARACTER_INSTRUMENTS[Math.abs(seedOf(id)) % CHARACTER_INSTRUMENTS.length] });
+  }
+  return { characters: names, perSentence };
 }
 
 // --- Chapitres --------------------------------------------------------------------------------
@@ -134,7 +147,7 @@ export function buildStoryboard(sentences, sentScore, opts = {}) {
   }
 
   // personnages et leitmotifs : annoncés à leur entrée, puis rappelés après une absence
-  const { characters, perSentence } = detectCharacters(sentences);
+  const { characters, perSentence } = detectCharacters(sentences, { extra: opts.characters ?? [] });
   const last = {}, cues = perSentence.map(() => []);
   perSentence.forEach((ids, i) => ids.forEach((id) => { if (last[id] === undefined || i - last[id] > 6) cues[i].push(id); last[id] = i; }));
 

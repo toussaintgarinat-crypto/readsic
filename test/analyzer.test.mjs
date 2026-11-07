@@ -16,6 +16,16 @@ assert.equal(detectPlace('La porte de la taverne claqua.'), 'taverne');
 assert.equal(detectPlace('Le marécage s\'étendait devant elle.'), 'marais');
 assert.equal(detectPlace('Il faisait beau.'), null);
 
+// Régression : pas de lieu détecté dans une sous-chaîne ni dans un verbe (« félicité », « se forge », « ruinée »…).
+assert.equal(detectPlace('Le loup déjà se forge une félicité'), null);
+assert.equal(detectPlace('Une publicité sans limite.'), null);
+assert.equal(detectPlace('Il forge une épée dans la forge.'), 'cite', 'le nom « forge » reste reconnu');
+assert.equal(detectPlace('Ils quittèrent la cité à l\'aube.'), 'cite');
+assert.equal(detectPlace('La mercerie était fermée.'), null, '« mer » dans « mercerie »');
+assert.equal(detectPlace('Elle observait les vagues.'), 'mer');
+assert.equal(detectPlace('Le sentier longeait le bois.'), 'foret');
+assert.equal(detectPlace('Un boisseau de blé.'), null, '« bois » dans « boisseau »');
+
 // Persistance : après un saut en plein milieu du texte, le lieu courant est retrouvé en remontant.
 const iBack = S.findIndex((s) => /Au matin/.test(s));
 assert.equal(placeAt(S, iBack - 1), 'desert'); // le rêve se passe dans le désert

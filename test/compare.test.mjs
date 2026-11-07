@@ -29,4 +29,11 @@ const r3 = compareAnalyses(2, () => S(0, 'neutre'), () => null);
 assert.equal(r3.summary.covered, 0); assert.equal(r3.summary.tensionMAE, null); assert.equal(r3.summary.valenceAgree, null);
 
 assert.deepEqual(tally({ 1: 'llm', 2: 'llm', 3: 'lex', 4: 'tie', 5: 'n/importe quoi' }), { lex: 1, llm: 2, tie: 1, total: 4 });
+// import d'une analyse externe : validée et bornée
+import { normalizeScores } from '../src/llm-analyzer.js';
+const ok = normalizeScores([{ tension: 3, valence: 'tragique', movement: -1, place: 'foret' }, { tension: 'x', valence: 'inconnu', place: 'atlantide' }], 2);
+assert.deepEqual(ok[0], { tension: 1, movement: 0, valence: 'tragique', place: 'foret' });
+assert.deepEqual(ok[1], { tension: 0, movement: 0, valence: 'neutre', place: null });
+assert.throws(() => normalizeScores([{}], 2), /ne correspond pas/);
+assert.throws(() => normalizeScores({}, 2), /tableau/);
 console.log('OK — compare');

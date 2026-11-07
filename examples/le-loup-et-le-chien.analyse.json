@@ -1,0 +1,319 @@
+{
+ "source": "annotation manuelle (Claude, lecture du texte) — phrase par phrase",
+ "text": "le-loup-et-le-chien.txt",
+ "note": "Lieux interprétatifs : forêt (le texte dit « les bois »), logis du maître (château) pendant le récit de la vie du chien (phrases 26-32), retour à la forêt sur le chemin (33) puis dans la fuite finale.",
+ "scores": [
+  {
+   "tension": 0.3,
+   "valence": "melancolique",
+   "movement": 0.15,
+   "place": "foret"
+  },
+  {
+   "tension": 0.25,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.3,
+   "valence": "neutre",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.2,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.5,
+   "valence": "menacant",
+   "movement": 0.5,
+   "place": null
+  },
+  {
+   "tension": 0.55,
+   "valence": "menacant",
+   "movement": 0.4,
+   "place": null
+  },
+  {
+   "tension": 0.5,
+   "valence": "menacant",
+   "movement": 0.4,
+   "place": null
+  },
+  {
+   "tension": 0.45,
+   "valence": "menacant",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.35,
+   "valence": "menacant",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.25,
+   "valence": "neutre",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.2,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.15,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.15,
+   "valence": "joyeux",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.15,
+   "valence": "joyeux",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.2,
+   "valence": "neutre",
+   "movement": 0.3,
+   "place": "foret"
+  },
+  {
+   "tension": 0.4,
+   "valence": "melancolique",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.4,
+   "valence": "melancolique",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.5,
+   "valence": "tragique",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.45,
+   "valence": "menacant",
+   "movement": 0.5,
+   "place": null
+  },
+  {
+   "tension": 0.45,
+   "valence": "menacant",
+   "movement": 0.4,
+   "place": null
+  },
+  {
+   "tension": 0.45,
+   "valence": "menacant",
+   "movement": 0.4,
+   "place": null
+  },
+  {
+   "tension": 0.6,
+   "valence": "menacant",
+   "movement": 0.6,
+   "place": null
+  },
+  {
+   "tension": 0.15,
+   "valence": "joyeux",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.2,
+   "valence": "neutre",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.3,
+   "valence": "neutre",
+   "movement": 0.4,
+   "place": null
+  },
+  {
+   "tension": 0.3,
+   "valence": "neutre",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.15,
+   "valence": "joyeux",
+   "movement": 0.2,
+   "place": "chateau"
+  },
+  {
+   "tension": 0.1,
+   "valence": "joyeux",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.1,
+   "valence": "festif",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.1,
+   "valence": "festif",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.1,
+   "valence": "joyeux",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.1,
+   "valence": "onirique",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.1,
+   "valence": "onirique",
+   "movement": 0.1,
+   "place": null
+  },
+  {
+   "tension": 0.45,
+   "valence": "menacant",
+   "movement": 0.4,
+   "place": "foret"
+  },
+  {
+   "tension": 0.45,
+   "valence": "menacant",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.4,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.4,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.5,
+   "valence": "menacant",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.5,
+   "valence": "menacant",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.45,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.55,
+   "valence": "menacant",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.65,
+   "valence": "tragique",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.6,
+   "valence": "tragique",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.85,
+   "valence": "angoissant",
+   "movement": 0.6,
+   "place": null
+  },
+  {
+   "tension": 0.7,
+   "valence": "menacant",
+   "movement": 0.5,
+   "place": null
+  },
+  {
+   "tension": 0.65,
+   "valence": "menacant",
+   "movement": 0.4,
+   "place": null
+  },
+  {
+   "tension": 0.65,
+   "valence": "menacant",
+   "movement": 0.4,
+   "place": null
+  },
+  {
+   "tension": 0.5,
+   "valence": "neutre",
+   "movement": 0.2,
+   "place": null
+  },
+  {
+   "tension": 0.7,
+   "valence": "menacant",
+   "movement": 0.5,
+   "place": null
+  },
+  {
+   "tension": 0.55,
+   "valence": "tragique",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.5,
+   "valence": "tragique",
+   "movement": 0.3,
+   "place": null
+  },
+  {
+   "tension": 0.75,
+   "valence": "joyeux",
+   "movement": 1,
+   "place": "foret"
+  }
+ ]
+}

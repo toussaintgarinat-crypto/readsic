@@ -66,4 +66,15 @@ assert.equal(sb2.chapters.length, 2); assert.match(sb2.chapters[1].title, /Chapi
 
 // noms : pas de nom pour un mot commun
 assert.deepEqual(detectCharacters(splitSentences('Il pleut. Il fait beau. Il rit.')).characters, []);
+// personnages déclarés (noms communs, pluriels) : leitmotif propre, annonce à l'entrée
+const F = splitSentences('Le loup parle. Le chien répond. Les loups hurlent. Plus rien. Rien encore. Rien. Rien. Rien. Rien. Le chien revient.');
+const dc = detectCharacters(F, { extra: ['loup', ' chien ', 'dragon'] });
+assert.deepEqual(dc.characters.map((c) => c.id).sort(), ['chien', 'loup'], 'personnage absent ignoré');
+assert.equal(dc.characters.find((c) => c.id === 'loup').count, 2, 'pluriel reconnu');
+assert.deepEqual(dc.perSentence[2], ['loup']);
+assert.ok(dc.characters.every((c) => c.declared && c.motif.length >= 5));
+assert.notDeepEqual(dc.characters[0].motif, dc.characters[1].motif, 'un leitmotif par personnage');
+const sbF = buildStoryboard(F, (i) => analyzeWindow(F, i, [1]), { characters: ['chien'] });
+assert.deepEqual(sbF.characters.map((c) => c.id), ['chien']);
+assert.ok(sbF.cues[1].includes('chien') && sbF.cues[9].includes('chien'), 'annonce, puis rappel après une longue absence');
 console.log('OK — storyboard');

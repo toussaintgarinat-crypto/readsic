@@ -59,23 +59,26 @@ export function keyInfo(rootPc, modeName) {
   return { label: `${pcName(rootPc)} ${m.q === 'M' ? 'majeur' : 'mineur'}`, emotion: KEY_EMOTION[id] ?? null, mode: m };
 }
 
+// Motif « mots entiers » : frontières de lettres Unicode (\b de JavaScript ne connaît pas « é »).
+const W = (...alts) => new RegExp(`(?<![\\p{L}])(?:${alts.join('|')})(?![\\p{L}])`, 'iu');
+
 // Signature sonore par lieu. pc = classe de hauteur de la tonique (0 = Do).
 export const PLACES = {
-  marais:  { name: 'Marécage', pattern: /mar[ée]cage|marais|tourbi[èe]re|vase\b|brume|swamp|bayou/i,
+  marais:  { name: 'Marécage', pattern: W('mar[ée]cages?', 'marais', 'tourbi[èe]res?', 'vase', 'brumes?', 'swamp', 'bayou'),
              pc: 2, rootHz: 73.42, mode: 'aeolian', instrument: 'bell', tempo: 54, density: 0.35, cutoff: 700, reverb: 0.75, octave: 2 },        // Ré mineur : gravité, mystère
-  taverne: { name: 'Taverne', pattern: /taverne|auberge|tavernier|chope|bi[èe]re|comptoir|tavern|\binn\b/i,
+  taverne: { name: 'Taverne', pattern: W('tavernes?', 'auberges?', 'taverniers?', 'chopes?', 'bi[èe]res?', 'comptoirs?', 'tavern', 'inn'),
              pc: 7, rootHz: 98.0, mode: 'mixolydian', instrument: 'pluck', tempo: 118, density: 0.85, cutoff: 3600, reverb: 0.12, octave: 3 }, // Sol mixolydien : fête détendue
-  foret:   { name: 'Forêt', pattern: /for[êe]t|\bbois\b|sentier|feuillage|sous-bois|clairi[èe]re|forest|woods/i,
+  foret:   { name: 'Forêt', pattern: W('for[êe]ts?', 'bois', 'sentiers?', 'feuillages?', 'sous-bois', 'clairi[èe]res?', 'forest', 'woods'),
              pc: 5, rootHz: 87.31, mode: 'ionian', instrument: 'flute', tempo: 70, density: 0.5, cutoff: 2400, reverb: 0.45, octave: 3 },       // Fa majeur : calme, pastoral, paix
-  cite:    { name: 'Cité industrielle', pattern: /cit[ée]|usine|chemin[ée]e|forge|ruelle|faubourg|fonderie|\bcity\b|factory/i,
+  cite:    { name: 'Cité industrielle', pattern: W('cit[ée]s?', 'usines?', 'chemin[ée]es?', "(?<!(?:se |te |me |nous |vous |s'))forges?", 'ruelles?', 'faubourgs?', 'fonderies?', 'city', 'factory'),
              pc: 0, rootHz: 65.41, mode: 'phrygian', instrument: 'brass', tempo: 88, density: 0.5, cutoff: 1500, reverb: 0.3, octave: 2 },      // Do : obscurité, tension
-  mer:     { name: 'Mer', pattern: /\bmer\b|oc[ée]an|vagues?|rivage|navire|\bport\b|falaise|sea\b|shore/i,
+  mer:     { name: 'Mer', pattern: W('mer', 'oc[ée]ans?', 'vagues?', 'rivages?', 'navires?', 'ports?', 'falaises?', 'sea', 'shore'),
              pc: 4, rootHz: 82.41, mode: 'lydian', instrument: 'strings', tempo: 60, density: 0.4, cutoff: 2000, reverb: 0.6, octave: 3 },      // Mi lydien : éclat, onirique
-  chateau: { name: 'Château', pattern: /ch[âa]teau|donjon|remparts?|salle du tr[ôo]ne|castle|citadelle/i,
+  chateau: { name: 'Château', pattern: W('ch[âa]teaux?', 'donjons?', 'remparts?', 'salle du tr[ôo]ne', 'castle', 'citadelles?'),
              pc: 5, rootHz: 87.31, mode: 'aeolian', instrument: 'brass', tempo: 66, density: 0.45, cutoff: 1800, reverb: 0.55, octave: 2 },    // Fa mineur : deuil, mélancolie profonde
-  grotte:  { name: 'Grotte', pattern: /grotte|caverne|souterrain|galerie obscure|cave\b|cavern/i,
+  grotte:  { name: 'Grotte', pattern: W('grottes?', 'cavernes?', 'souterrains?', 'galerie obscure', 'cave', 'cavern'),
              pc: 11, rootHz: 61.74, mode: 'phrygian', instrument: 'bell', tempo: 48, density: 0.3, cutoff: 900, reverb: 0.9, octave: 2 },      // Si mineur : solitude
-  desert:  { name: 'Désert', pattern: /d[ée]sert|dunes?\b|oasis|bazar|souk|caravane|sultan|minaret/i,
+  desert:  { name: 'Désert', pattern: W('d[ée]serts?', 'dunes?', 'oasis', 'bazars?', 'souks?', 'caravanes?', 'sultans?', 'minarets?'),
              pc: 4, rootHz: 82.41, mode: 'phrygianDom', instrument: 'pluck', tempo: 84, density: 0.55, cutoff: 2800, reverb: 0.35, octave: 3 }, // Mi phrygien dominant : flamenco, exotisme
   defaut:  { name: 'Lieu indéfini', pattern: null,
              pc: 0, rootHz: 130.81, mode: 'dorian', instrument: 'pluck', tempo: 72, density: 0.45, cutoff: 2600, reverb: 0.3, octave: 3 },

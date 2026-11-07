@@ -1,8 +1,23 @@
 // Client navigateur de l'analyseur LLM (via /api/analyze). Les phrases sont analysées par lots,
 // en avance de lecture ; tant qu'un lot n'est pas revenu, l'heuristique par mots-clés prend le relais.
 import { hashText } from './memory.js';
+import { PLACES, VALENCE_MODE } from './places.js';
 
 const CHUNK = 8;
+
+const clamp01 = (x) => Math.min(1, Math.max(0, Number.isFinite(+x) ? +x : 0));
+
+// Valide et borne une analyse fournie de l'extérieur (annotation manuelle, autre outil) :
+// tableau d'un élément par phrase { tension, valence, movement, place }.
+export function normalizeScores(list, n) {
+  if (!Array.isArray(list)) throw new Error('format attendu : un tableau "scores" (ou le tableau seul)');
+  if (list.length !== n) throw new Error(`${list.length} éléments pour ${n} phrases : l'analyse ne correspond pas à ce texte`);
+  return list.map((r) => r && {
+    tension: clamp01(r.tension), movement: clamp01(r.movement),
+    valence: r.valence in VALENCE_MODE ? r.valence : 'neutre',
+    place: r.place in PLACES && r.place !== 'defaut' ? r.place : null,
+  });
+}
 
 export class LlmScores {
   constructor(sentences, { onUpdate = () => {} } = {}) {
@@ -32,6 +47,9 @@ export class LlmScores {
   // undefined = pas encore analysé ; null = aucun lieu ; sinon id de lieu.
   placeAt(i) { const s = this.scores[i]; return s ? s.place : undefined; }
   sentScore(i) { const s = this.scores[i]; return s ? { tension: s.tension, valence: s.valence, movement: s.movement } : null; }
+
+  // Analyse fournie de l'extérieur : remplace l'appel au serveur.
+  import(list) { this.scores = normalizeScores(list, this.sentences.length); this.imported = true; this.onUpdate(this); }
 
   focus(i) { this.cursor = i; }
 
