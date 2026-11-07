@@ -77,4 +77,17 @@ assert.notDeepEqual(dc.characters[0].motif, dc.characters[1].motif, 'un leitmoti
 const sbF = buildStoryboard(F, (i) => analyzeWindow(F, i, [1]), { characters: ['chien'] });
 assert.deepEqual(sbF.characters.map((c) => c.id), ['chien']);
 assert.ok(sbF.cues[1].includes('chien') && sbF.cues[9].includes('chien'), 'annonce, puis rappel après une longue absence');
+// résolution : tout arc à climax modulé revient à la tonique du lieu avant sa fin
+for (const c of sb.chapters) {
+  if (c.climax === null || c.end - c.climax < 5) continue;
+  const lastPhaseIdx = plan.phase.slice(c.start, c.end + 1).lastIndexOf('resolution');
+  if (lastPhaseIdx < 1) continue;
+  const end = c.start + lastPhaseIdx;
+  if (plan.place[end] === plan.place[end - 1]) assert.equal(plan.offset[end], 0, `retour à la tonique en fin d'arc ${c.title}`);
+}
+// cas construit : montée en tension (modulation à la dominante) puis retombée longue => retour à 0
+const Hs = splitSentences(['Calme.', 'Calme.', 'Calme.', 'Calme.', 'Calme.', 'Calme.', 'Le sang, la peur, un cri !', 'Le sang, la peur, la lame !', 'Le sang, la mort, un cri !', 'Calme.', 'Calme.', 'Calme.', 'Calme.', 'Calme.', 'Calme.', 'Calme.'].join(' '));
+const sbH = buildStoryboard(Hs, (i) => analyzeWindow(Hs, i, [1]));
+assert.ok(sbH.plan.offset.some((o) => o !== 0), 'une modulation a eu lieu');
+assert.equal(sbH.plan.offset.at(-1), 0, 'le morceau finit à la tonique');
 console.log('OK — storyboard');

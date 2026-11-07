@@ -143,6 +143,11 @@ export function buildStoryboard(sentences, sentScore, opts = {}) {
   for (let i = 0; i < n; i++) {
     if (place[i] !== curPlace) { if (curPlace) mem[curPlace] = mod.offset; mod.reset(mem[place[i]] ?? 0); curPlace = place[i]; }
     move[i] = mod.update({ tension: plan[i], valence: valence[i] });
+    // Résolution : le morceau boucle en revenant à la tonique du lieu (sinon il finirait dans une tonalité empruntée).
+    if (!move[i] && mod.offset !== 0 && phase[i] === 'resolution' && phase[i - 1] === 'resolution' && place[i] === place[i - 1]) {
+      mod.offset = 0; mod.cool = 3;
+      move[i] = { kind: 'retour', label: 'retour à la tonique — résolution', semi: 0, offset: 0 };
+    }
     offset[i] = mod.offset;
   }
 
