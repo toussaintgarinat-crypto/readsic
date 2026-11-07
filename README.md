@@ -23,6 +23,13 @@ L'analyse sémantique peut être confiée à un LLM (meilleure compréhension de
 
 Ajouter un autre fournisseur = écrire un objet `{ name, model, available(), complete({system, user, schema}) → texte JSON }` dans `providers.mjs`. Le format de sortie est validé et borné côté serveur (`normalizeResults`), donc un modèle moins fiable ne peut pas casser le moteur ; les phrases pas encore analysées retombent sur les mots-clés. Les lots sont analysés en avance de lecture et mis en cache (`localStorage`).
 
+### Comparer mots-clés et LLM sur vos textes
+
+Le bouton « Comparer mots-clés / LLM » (actif dès qu'un fournisseur est configuré) analyse tout le texte avec le LLM et le met en regard de l'heuristique locale, sans changer ce que vous écoutez :
+- indicateurs d'accord : corrélation et écart moyen de tension, même valence, même lieu, part de « neutre » de chaque côté ;
+- courbes de tension superposées ;
+- les phrases où les deux analyses divergent le plus (cliquer pour l'écouter), avec un vote **mots-clés / égalité / LLM** par phrase. Les votes sont conservés par texte et par modèle : c'est la mesure à regarder pour choisir un fournisseur, plus que l'accord entre les deux, qui ne dit pas qui a raison.
+
 ## Mode 2 — cinématographique (`src/storyboard.js`)
 
 « Composer (analyse globale) » lit tout le texte et construit un plan, phrase par phrase :

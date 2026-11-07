@@ -5,6 +5,8 @@ import { MusicEngine } from './engine.js';
 import { Memory, hashText } from './memory.js';
 import { LlmScores } from './llm-analyzer.js';
 import { buildStoryboard } from './storyboard.js';
+import { compareAnalyses, tally } from './compare.js';
+import { detectPlace } from './analyzer.js';
 import { SAMPLE_TEXT } from './sample.js';
 
 const $ = (id) => document.getElementById(id);
@@ -19,6 +21,8 @@ let llm = null;          // LlmScores quand la source "Claude" est active
 let sb = null;           // storyboard (mode 2)
 let mode = 'live';       // 'live' | 'cinema'
 let llmAvailable = false;
+let cmpLlm = null;       // scores LLM utilisés par la comparaison (indépendants de la source d'écoute)
+let llmInfo = null;
 
 // ---- sources d'analyse ------------------------------------------------------
 const detectFn = () => (llm ? (_s, k) => llm.placeAt(k) : null);
@@ -31,7 +35,7 @@ function load(t) {
   memory = new Memory(hashText(text));
   llm = null; sb = null; mode = 'live';
   $('source').value = 'lex'; $('mode').value = 'live'; $('mode').options[1].disabled = true;
-  $('storyboard').hidden = true; $('chars-card').hidden = true; $('llm-status').textContent = '—'; $('compose-status').textContent = '';
+  $('storyboard').hidden = true; $('chars-card').hidden = true; $('compare').hidden = true; cmpLlm = null; $('llm-status').textContent = '—'; $('compose-status').textContent = '';
   current = Math.min(memory.data.position ?? 0, Math.max(0, sentences.length - 1));
   render();
   highlight();
@@ -173,6 +177,70 @@ async function setSource(src) {
   $('storyboard').hidden = true; $('chars-card').hidden = true; $('compose-status').textContent = '';
 }
 
+// ---- Comparaison mots-clés / LLM ---------------------------------------------
+const lexAt = (i) => ({ ...analyzeWindow(sentences, i, [1]), place: detectPlace(sentences[i]) });
+const pct = (x) => (x === null ? '—' : `${Math.round(x * 100)} %`);
+const f2 = (x) => (x === null ? '—' : x.toFixed(2));
+const prefKey = () => `readsic.cmp.v1.${hashText(text)}.${llmInfo?.provider}.${llmInfo?.model}`;
+const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(prefKey()) ?? '{}'); } catch { return {}; } };
+let cmpAll = false;
+
+async function openCompare() {
+  const btn = $('compare-btn');
+  btn.disabled = true;
+  try {
+    cmpLlm = llm ?? cmpLlm ?? new LlmScores(sentences, { onUpdate: (l) => ($('compose-status').textContent = l.error ? `LLM : ${l.error}` : `LLM : ${l.done}/${sentences.length} phrases analysées…`) });
+    if (!cmpLlm.complete) { cmpLlm.focus(current); await cmpLlm.completeAll(); }
+    if (!cmpLlm.complete) { $('compose-status').textContent = `Comparaison impossible : ${cmpLlm.error ?? 'analyse LLM incomplète'}.`; return; }
+    $('compose-status').textContent = '';
+    renderCompare();
+  } finally { btn.disabled = !llmAvailable; }
+}
+
+function renderCompare() {
+  const { rows, summary: m } = compareAnalyses(sentences.length, lexAt, (i) => {
+    const s = cmpLlm.scores[i]; return s ? { tension: s.tension, valence: s.valence, movement: s.movement, place: s.place } : null;
+  });
+  const prefs = loadPrefs();
+  $('cmp-model').textContent = llmInfo ? `— ${llmInfo.provider} / ${llmInfo.model}` : '';
+  const cell = (v, l) => `<div><b>${v}</b><span>${l}</span></div>`;
+  $('cmp-summary').innerHTML =
+    cell(`${m.covered}/${m.n}`, 'phrases comparées') + cell(f2(m.tensionCorr), 'corrélation de tension') +
+    cell(f2(m.tensionMAE), 'écart moyen de tension') + cell(pct(m.valenceAgree), 'même valence') +
+    cell(pct(m.placeAgree), 'même lieu') + cell(`${pct(m.lexNeutral)} / ${pct(m.llmNeutral)}`, 'neutre : mots-clés / LLM');
+
+  // courbes superposées
+  const n = rows.length, x = (i) => (sentences.length > 1 ? (i / (sentences.length - 1)) * 600 : 0), y = (t) => 105 - t * 100;
+  const line = (k) => `<path stroke="${k === 'lex' ? '#e0a84a' : '#5aa9e6'}" d="${rows.map((r, j) => `${j ? 'L' : 'M'}${x(r.i).toFixed(1)},${y(r[k].tension).toFixed(1)}`).join(' ')}"/>`;
+  $('cmp-svg').innerHTML = n ? line('lex') + line('llm') : '';
+
+  // tableau : plus gros désaccords d'abord
+  const shown = [...rows].sort((a, b) => b.gap - a.gap).filter((r) => cmpAll || r.gap > 0.25).slice(0, cmpAll ? rows.length : 12);
+  const tbl = $('cmp-table'); tbl.innerHTML = '';
+  const t = tally(prefs);
+  $('cmp-verdict').textContent = t.total
+    ? `Votre verdict sur ${t.total} phrase(s) : mots-clés ${t.lex} · LLM ${t.llm} · égalité ${t.tie}.`
+    : 'Cliquez sur la phrase pour l’écouter, puis votez : quelle analyse est la plus juste ?';
+  if (!shown.length) tbl.innerHTML = '<tr><td class="muted">Aucun désaccord notable.</td></tr>';
+  for (const r of shown) {
+    const tr = document.createElement('tr'); tr.className = 'row';
+    const td = (cls, txt) => { const c = document.createElement('td'); c.className = cls; c.textContent = txt; tr.appendChild(c); return c; };
+    td('txt', sentences[r.i]);
+    const desc = (a) => `${a.valence} · T ${a.tension.toFixed(2)} · M ${a.movement.toFixed(2)}${a.place ? ' · ' + PLACES[a.place]?.name : ''}`;
+    td('num', 'mots-clés : ' + desc(r.lex)); td('num', 'LLM : ' + desc(r.llm));
+    const vote = document.createElement('td');
+    for (const [k, label] of [['lex', 'mots-clés'], ['tie', '='], ['llm', 'LLM']]) {
+      const b = document.createElement('button'); b.className = 'ghost' + (prefs[r.i] === k ? ' on' : ''); b.textContent = label;
+      b.onclick = (e) => { e.stopPropagation(); prefs[r.i] = k; try { localStorage.setItem(prefKey(), JSON.stringify(prefs)); } catch { /* quota */ } renderCompare(); };
+      vote.appendChild(b);
+    }
+    tr.appendChild(vote);
+    tr.onclick = () => goTo(r.i, true);
+    tbl.appendChild(tr);
+  }
+  $('compare').hidden = false;
+}
+
 // ---- Mode 2 : storyboard ---------------------------------------------------
 async function compose() {
   const btn = $('compose'), st = $('compose-status');
@@ -264,6 +332,8 @@ $('load').onclick = () => { const v = $('custom').value.trim(); if (v) { toggleA
 $('source').onchange = (e) => setSource(e.target.value);
 $('mode').onchange = (e) => { mode = e.target.value; goTo(current, true); };
 $('compose').onclick = () => compose();
+$('compare-btn').onclick = () => openCompare();
+$('cmp-all').onchange = (e) => { cmpAll = e.target.checked; renderCompare(); };
 $('sb-svg').onclick = (e) => {
   if (!sb) return;
   const r = e.currentTarget.getBoundingClientRect();
@@ -278,9 +348,10 @@ document.addEventListener('keydown', (e) => {
 
 load(SAMPLE_TEXT);
 LlmScores.available().then((h) => {
-  llmAvailable = h.llm;
+  llmAvailable = h.llm; llmInfo = h;
+  $('compare-btn').disabled = !h.llm;
   $('source').options[1].disabled = !h.llm;
   if (h.llm) $('source').options[1].textContent = `LLM : ${h.provider} / ${h.model}`;
   $('llm-status').textContent = h.llm ? `Analyse LLM disponible (${h.provider})` : 'Analyse LLM indisponible — configurer un fournisseur (voir README)';
 });
-window.__readsic = { engine, goTo, get memory() { return memory; }, get sb() { return sb; }, compose, setSource, get llm() { return llm; } }; // debug/tests
+window.__readsic = { openCompare, engine, goTo, get memory() { return memory; }, get sb() { return sb; }, compose, setSource, get llm() { return llm; } }; // debug/tests

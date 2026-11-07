@@ -24,6 +24,15 @@
       <svg id="sb-svg" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="Courbe de tension planifiée"></svg>
       <div id="sb-legend" class="legend"></div>
     </section>
+    <section id="compare" class="card" hidden>
+      <h2>Comparaison mots-clés / LLM <span id="cmp-model" class="muted"></span></h2>
+      <div id="cmp-summary" class="cmp-grid"></div>
+      <svg id="cmp-svg" viewBox="0 0 600 110" preserveAspectRatio="none" role="img" aria-label="Tension : mots-clés et LLM superposés"></svg>
+      <div class="legend"><span><i style="background:#e0a84a"></i>mots-clés</span><span><i style="background:#5aa9e6"></i>LLM</span></div>
+      <h2 style="margin-top:12px">Désaccords <label class="muted"><input type="checkbox" id="cmp-all"> tout afficher</label></h2>
+      <div id="cmp-verdict" class="muted"></div>
+      <table id="cmp-table"></table>
+    </section>
     <section id="reader" aria-label="Texte"></section>
   </div>
   <aside>
@@ -37,6 +46,7 @@
         <select id="mode"><option value="live">1 · Temps réel</option><option value="cinema" disabled>2 · Cinématographique</option></select>
       </label>
       <button id="compose" class="ghost">Composer (analyse globale)</button>
+      <button id="compare-btn" class="ghost" disabled>Comparer mots-clés / LLM</button>
       <div id="compose-status" class="muted"></div>
     </div>
     <div class="card" id="chars-card" hidden>
