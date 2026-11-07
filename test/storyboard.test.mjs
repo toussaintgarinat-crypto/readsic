@@ -90,4 +90,15 @@ const Hs = splitSentences(['Calme.', 'Calme.', 'Calme.', 'Calme.', 'Calme.', 'Ca
 const sbH = buildStoryboard(Hs, (i) => analyzeWindow(Hs, i, [1]));
 assert.ok(sbH.plan.offset.some((o) => o !== 0), 'une modulation a eu lieu');
 assert.equal(sbH.plan.offset.at(-1), 0, 'le morceau finit à la tonique');
+// libération : une fin lumineuse après une résolution sombre donne un mode majeur et une bascule ombre → lumière
+import fs from 'node:fs';
+import { normalizeScores } from '../src/llm-analyzer.js';
+const L = splitSentences(fs.readFileSync(new URL('../examples/le-loup-et-le-chien.txt', import.meta.url), 'utf8'));
+const ann = normalizeScores(JSON.parse(fs.readFileSync(new URL('../examples/le-loup-et-le-chien.analyse.json', import.meta.url), 'utf8')).scores, L.length);
+const sbL = buildStoryboard(L, (i) => ann[i], { detect: (_s, i) => ann[i].place, characters: ['loup', 'chien'] });
+assert.equal(sbL.plan.valence.at(-1), 'joyeux', 'la fuite finale est lumineuse');
+assert.equal(sbL.plan.phase.at(-1), 'resolution');
+assert.ok(sbL.plan.move.slice(-4).some((m) => m?.kind === 'parallele'), 'bascule ombre → lumière en fin de morceau');
+assert.equal(sbL.plan.offset.at(-1), 0, 'et dans la tonique du lieu');
+assert.notEqual(sbL.plan.valence.at(-2), 'joyeux', 'seule la phrase lumineuse est concernée');
 console.log('OK — storyboard');

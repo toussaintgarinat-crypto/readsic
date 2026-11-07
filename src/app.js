@@ -84,6 +84,7 @@ function highlight() {
 
 // ---- lecture ---------------------------------------------------------------
 function goTo(i, jumped = false) {
+  engine.unfade();
   current = Math.max(0, Math.min(sentences.length - 1, i));
   highlight();
   memory.setPosition(current);
@@ -376,7 +377,7 @@ function scheduleAuto() {
   const words = sentences[current].split(/\s+/).length;
   const ms = (words / Number($('wpm').value)) * 60000 + 250;
   autoTimer = setTimeout(() => {
-    if (current >= sentences.length - 1) { toggleAuto(false); return; }
+    if (current >= sentences.length - 1) { toggleAuto(false); engine.fadeOut(6); return; }
     goTo(current + 1); scheduleAuto();
   }, ms);
 }

@@ -44,6 +44,20 @@ export class MusicEngine {
     this.timer = setInterval(() => this.tick(), 100);
   }
 
+  // Fondu de sortie (fin de lecture) ; le son revient au prochain mouvement (unfade).
+  fadeOut(sec = 6) {
+    if (!this.ctx || this.faded) return;
+    const g = this.master.gain, now = this.ctx.currentTime;
+    g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.0001, now + sec);
+    this.faded = true;
+  }
+  unfade() {
+    if (!this.faded) return;
+    const g = this.master.gain, now = this.ctx.currentTime;
+    g.cancelScheduledValues(now); g.setValueAtTime(Math.max(g.value, 0.0001), now); g.setTargetAtTime(this.volume, now, 0.15);
+    this.faded = false;
+  }
+
   // Enregistrement de la sortie audio (ce que vous entendez) -> Blob audio (webm/opus).
   recordStart() {
     if (!this.ctx || this.recorder) return false;

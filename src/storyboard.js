@@ -137,6 +137,10 @@ export function buildStoryboard(sentences, sentScore, opts = {}) {
     valence.push(prev === 'menacant' && plan[i] >= 0.75 ? 'angoissant' : prev);
   }
 
+  // Libération : en phase de résolution, une phrase lumineuse (joyeuse/festive) n'est pas lissée avec les phrases
+  // sombres qui la précèdent. Elle donne sa couleur à la fin du morceau (bascule ombre → lumière, mode majeur).
+  for (let i = 0; i < n; i++) if (phase[i] === 'resolution' && (raw[i].valence === 'joyeux' || raw[i].valence === 'festif')) valence[i] = raw[i].valence;
+
   // modulations planifiées, avec la même persistance par lieu que le mode temps réel
   const mod = new Modulator(), mem = {}, offset = [], move = [];
   let curPlace = null;
