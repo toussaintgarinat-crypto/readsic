@@ -54,6 +54,12 @@ Instruments synthétisés (Web Audio), sans fichier à charger :
 
 **Vos propres échantillons** (facultatif, `samples/README.md`) : un fichier d'une seule note par instrument + `samples/manifest.json` ; le moteur le transpose et retombe sur la synthèse si le fichier manque. Je n'embarque aucun échantillon : les sons doivent venir de vos enregistrements ou d'une banque dont vous maîtrisez la licence.
 
+## Vidéo à paroles (`scripts/lyric-video.mjs`)
+
+Assemble un MP4 : le texte défile phrase par phrase, synchronisé sur un rendu audio, avec une forme d'onde et, si l'on fournit la chronologie de l'enregistrement, le lieu / la tonalité / la tension en bas.
+`node scripts/lyric-video.mjs texte.txt audio.mp3 sortie.mp4 --title "…" [--wpm 170] [--timeline timeline.json]` (ffmpeg requis).
+Les instants viennent de la même formule que la lecture automatique (mots / mots-par-minute + 250 ms) : ils collent à la musique enregistrée à la même vitesse. Exemple : `examples/rendu/`.
+
 ## Mode 2 — cinématographique (`src/storyboard.js`)
 
 « Composer (analyse globale) » lit tout le texte et construit un plan, phrase par phrase :
