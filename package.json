@@ -4,8 +4,11 @@
   "description": "Prototype A : bande originale adaptative générée à la volée pendant la lecture",
   "type": "module",
   "scripts": {
-    "start": "python3 -m http.server 8080",
-    "test": "node test/analyzer.test.mjs"
+    "start": "node server.mjs",
+    "test": "node test/analyzer.test.mjs && node test/storyboard.test.mjs && node test/server.test.mjs"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0"
+  }
 }

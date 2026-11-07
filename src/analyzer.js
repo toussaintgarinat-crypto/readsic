@@ -39,7 +39,7 @@ export function splitSentences(text) {
     .filter(Boolean);
 }
 
-function scoreSentence(s) {
+export function scoreSentence(s) {
   const t = tokens(s);
   const bangs = (s.match(/!/g) ?? []).length;
   const caps = (s.match(/\b[A-ZÀ-Ý]{3,}\b/g) ?? []).length;
@@ -60,20 +60,25 @@ function scoreSentence(s) {
 }
 
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+export const VAL_KEYS = ['joyeux', 'festif', 'melancolique', 'menacant', 'tragique', 'onirique', 'exotique', 'angoissant'];
+const HEADING = /^\s*(#{1,3}\s|chapitre\b|chapter\b|partie\b|prologue\b|[ée]pilogue\b|acte\b)/i;
+export const isHeading = (s) => HEADING.test(s) && s.length < 80;
 const WEIGHTS = [1, 0.8, 0.6, 0.45, 0.3]; // phrase courante + 4 en avance (look-ahead)
 
-export function analyzeWindow(sentences, i, weights = WEIGHTS) {
+// scoreFn(index) -> { tension, val, movement } | null : source de score alternative (ex. LLM) ;
+// null => repli sur l'heuristique par mots-clés.
+export function analyzeWindow(sentences, i, weights = WEIGHTS, scoreFn = null) {
   let wsum = 0, tAvg = 0, tMax = 0, mAvg = 0;
-  const val = { joyeux: 0, festif: 0, melancolique: 0, menacant: 0, tragique: 0, onirique: 0, exotique: 0 };
+  const val = Object.fromEntries(VAL_KEYS.map((k) => [k, 0]));
   weights.forEach((w, k) => {
     const s = sentences[i + k];
     if (s === undefined) return;
-    const r = scoreSentence(s);
+    const r = (scoreFn && scoreFn(i + k)) || scoreSentence(s);
     wsum += w;
     tAvg += r.tension * w;
     tMax = Math.max(tMax, r.tension * w);
     mAvg += r.movement * w;
-    for (const key of Object.keys(val)) val[key] += r.val[key] * w;
+    for (const key of VAL_KEYS) val[key] += (r.val[key] ?? 0) * w;
   });
   if (!wsum) return { tension: 0, valence: 'neutre', movement: 0.3 };
   // Moyenne lissée + pic anticipé : la musique "voit venir" le danger sans sauter au mot près.
@@ -91,9 +96,11 @@ export function detectPlace(sentence) {
 }
 
 // Lieu "courant" : dernière mention en remontant depuis la phrase i (utile après un saut ou une reprise).
-export function placeAt(sentences, i) {
+// detect(sentence, index) -> id | null | undefined (undefined => heuristique par mots-clés).
+export function placeAt(sentences, i, detect = null) {
   for (let k = Math.min(i, sentences.length - 1); k >= 0; k--) {
-    const p = detectPlace(sentences[k]);
+    const d = detect ? detect(sentences[k], k) : undefined;
+    const p = d !== undefined ? d : detectPlace(sentences[k]);
     if (p) return p;
   }
   return DEFAULT_PLACE;

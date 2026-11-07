@@ -1,26 +1,8 @@
 // Moteur de synthèse Web Audio : scènes par lieu (crossfade) + couche de tension globale.
 import { PLACES, MODES, VALENCE_MODE } from './places.js';
+import { mulberry32, seedOf, makeMotif } from './motif.js';
 
 const lerp = (a, b, k) => a + (b - a) * k;
-
-function mulberry32(a) {
-  return () => {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const seedOf = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
-
-// Leitmotif déterministe par lieu : même lieu => même mélodie, à chaque visite.
-function makeMotif(placeId) {
-  const r = mulberry32(seedOf(placeId));
-  const len = 6 + Math.floor(r() * 3);
-  const m = [0];
-  for (let i = 1; i < len; i++) m.push(Math.max(-2, Math.min(7, m[i - 1] + Math.round((r() - 0.5) * 5))));
-  return m;
-}
 
 export class MusicEngine {
   constructor() {
@@ -263,6 +245,20 @@ export class MusicEngine {
     oscs.forEach((o) => o.connect(node));
     g.connect(s.filter);
     oscs[0].onended = () => g.disconnect();
+  }
+
+  // Leitmotif de personnage : joué une fois, transposé dans la tonalité et le mode courants du lieu.
+  playLeitmotif(c) {
+    const s = this.scene, ctx = this.ctx; if (!s || !ctx) return false;
+    const scale = this.scaleOf(s), t0 = ctx.currentTime + 0.15, beat = 60 / (s.place.tempo * 0.9);
+    c.motif.forEach((deg, k) => {
+      const oct = Math.floor(deg / scale.length);
+      const semi = scale[((deg % scale.length) + scale.length) % scale.length] + 12 * oct;
+      const f = this.rootOf(s) * 2 ** s.place.octave * 2 ** (semi / 12);
+      this.playNote(s, c.instrument, f, t0 + k * beat * 0.75, beat * 0.9, 0.22);
+    });
+    this.leitmotifCount = (this.leitmotifCount ?? 0) + 1;
+    return true;
   }
 
   kick(s, time, vel) {

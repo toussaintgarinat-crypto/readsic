@@ -18,8 +18,32 @@
 </header>
 
 <main>
-  <section id="reader" aria-label="Texte"></section>
+  <div class="col">
+    <section id="storyboard" class="card" hidden>
+      <h2>Storyboard musical <span id="sb-sub" class="muted"></span></h2>
+      <svg id="sb-svg" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="Courbe de tension planifiée"></svg>
+      <div id="sb-legend" class="legend"></div>
+    </section>
+    <section id="reader" aria-label="Texte"></section>
+  </div>
   <aside>
+    <div class="card">
+      <h2>Analyse &amp; mode</h2>
+      <label class="row">Source
+        <select id="source"><option value="lex">Mots-clés (local)</option><option value="llm" disabled>LLM (serveur)</option></select>
+      </label>
+      <div id="llm-status" class="muted">—</div>
+      <label class="row">Mode
+        <select id="mode"><option value="live">1 · Temps réel</option><option value="cinema" disabled>2 · Cinématographique</option></select>
+      </label>
+      <button id="compose" class="ghost">Composer (analyse globale)</button>
+      <div id="compose-status" class="muted"></div>
+    </div>
+    <div class="card" id="chars-card" hidden>
+      <h2>Leitmotifs</h2>
+      <ul id="chars" class="muted"></ul>
+      <div id="flash" class="muted">—</div>
+    </div>
     <div class="card">
       <h2>Lieu courant</h2>
       <div id="place" class="place">—</div>

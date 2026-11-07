@@ -4,9 +4,35 @@ Bande originale adaptative générée **à la volée** pendant la lecture d'un t
 Aucune dépendance, aucun build : HTML + modules ES + Web Audio.
 
 ```bash
-npm start        # puis ouvrir http://localhost:8080
-npm test         # tests de l'analyseur
+npm install
+npm start        # puis ouvrir http://localhost:8080 (analyse par mots-clés, sans clé)
+npm test
 ```
+
+## Analyse par LLM — fournisseur au choix
+
+L'analyse sémantique peut être confiée à un LLM (meilleure compréhension des négations, de l'ironie, des lieux non listés). Le navigateur ne parle qu'à `/api/analyze` ; le **serveur** (`server.mjs`) porte la clé et choisit le fournisseur (`providers.mjs`). Aucun fournisseur n'est imposé : sans configuration, l'appli fonctionne avec les mots-clés.
+
+| Fournisseur | Lancement |
+|---|---|
+| Anthropic | `ANTHROPIC_API_KEY=… npm start` (modèle `claude-haiku-5-5` par défaut, `ANTHROPIC_MODEL` pour changer) |
+| Modèle local (Ollama) | `LLM_PROVIDER=ollama LLM_MODEL=llama3.1 npm start` — aucune clé, rien ne quitte la machine |
+| LM Studio | `LLM_PROVIDER=lmstudio LLM_MODEL=<modèle> npm start` |
+| OpenAI | `LLM_PROVIDER=openai LLM_API_KEY=… LLM_MODEL=gpt-4o-mini npm start` |
+| Tout service compatible OpenAI (Mistral, Groq, OpenRouter, vLLM, llama.cpp…) | `LLM_BASE_URL=https://… LLM_API_KEY=… LLM_MODEL=… npm start` |
+
+Ajouter un autre fournisseur = écrire un objet `{ name, model, available(), complete({system, user, schema}) → texte JSON }` dans `providers.mjs`. Le format de sortie est validé et borné côté serveur (`normalizeResults`), donc un modèle moins fiable ne peut pas casser le moteur ; les phrases pas encore analysées retombent sur les mots-clés. Les lots sont analysés en avance de lecture et mis en cache (`localStorage`).
+
+## Mode 2 — cinématographique (`src/storyboard.js`)
+
+« Composer (analyse globale) » lit tout le texte et construit un plan, phrase par phrase :
+- **arcs** (titres `Chapitre…` s'il y en a, sinon coupes aux creux de tension) ;
+- **climax** par arc et **phases** : introduction → développement → paroxysme → résolution ; la tension monte *avant* le pic (anticipation) et retombe après ;
+- **valence** lissée (vote sur ±3 phrases + hystérésis : pas de coq-à-l'âne) ;
+- **modulations planifiées**, avec la même persistance par lieu que le mode 1 ;
+- **personnages** (noms propres) avec leur **leitmotif** et leur instrument, joués à leur entrée puis rappelés après une absence, transposés dans la tonalité et le mode courants.
+
+Le storyboard est affiché (courbe, phases, lieux, climax) ; un clic sur la courbe saute à l'endroit voulu.
 
 Cliquer sur « Lancer l'audio », puis sur une phrase (ou « Lecture auto », flèches ←/→, espace).
 
@@ -34,7 +60,7 @@ Cliquer sur « Lancer l'audio », puis sur une phrase (ou « Lecture auto », fl
 forêt → marécage → poursuite (tension, modulation en V) → taverne → rêve dans le désert (lydien, puis phrygien dominant) → **retour au marécage** : le leitmotif du marécage reprend là où il s'était arrêté, et le « malaise » mémorisé le rend plus sombre qu'à la première visite. Recharger la page reprend la lecture à la phrase où l'on s'était arrêté.
 
 ## Limites connues / suite
-- Analyse par mots-clés : fragile (négations, ironie, anglais partiel). Prochaine étape : classifieur ou LLM rapide derrière la même interface.
+- Analyse par mots-clés : fragile (négations, ironie, anglais partiel) ; l'analyse LLM la remplace quand un fournisseur est configuré. Le LLM n'a pas été testé contre une vraie API dans ce dépôt, seulement contre des serveurs simulés (`test/server.test.mjs`).
 - Synthèse simple (oscillateurs) : suffisant pour valider la logique, pas pour la qualité finale ; brancher des samples ou un modèle génératif.
 - Non exploité : les partitions de positions de tétrades (`position_*.pdf`), utiles seulement pour un futur moteur d'accords/voicings.
 - Mode 2 (analyse globale, storyboard musical, leitmotivs par personnage) non implémenté.
