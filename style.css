@@ -1,0 +1,27 @@
+:root { --bg:#0f1117; --fg:#e8e6e1; --mut:#8a8f9c; --card:#181b24; --acc:#e0a84a; --hot:#d9534f; --line:#262a36; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.7 Georgia, 'Times New Roman', serif; }
+header { padding:16px 20px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+h1 { margin:0; font-size:1.2rem; } h1 small { color:var(--mut); font-weight:normal; font-size:.75rem; margin-left:8px; }
+.controls { display:flex; flex-wrap:wrap; gap:12px; align-items:center; font:14px system-ui, sans-serif; color:var(--mut); }
+button { background:var(--acc); color:#1a1405; border:0; padding:8px 14px; border-radius:6px; font:600 14px system-ui, sans-serif; cursor:pointer; }
+button:disabled { opacity:.4; cursor:default; } button.ghost { background:transparent; color:var(--mut); border:1px solid var(--line); }
+main { display:grid; grid-template-columns: minmax(0,1fr) 320px; gap:20px; padding:20px; max-width:1100px; margin:0 auto; }
+#reader { font-size:1.15rem; }
+#reader p { margin:0 0 1.2em; }
+.s { cursor:pointer; border-radius:3px; padding:1px 0; transition:background .3s, color .3s; color:#b9b6ae; }
+.s:hover { background:#1f2330; }
+.s.look { color:#d8d4ca; background:#1a1d27; }
+.s.now { color:#fff; background:#2a2a1c; box-shadow:0 0 0 2px #2a2a1c; }
+aside { display:flex; flex-direction:column; gap:14px; font:14px system-ui, sans-serif; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+.card h2 { margin:0 0 8px; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:var(--mut); }
+.place { font:600 1.2rem Georgia, serif; } .muted { color:var(--mut); } 
+.meter { display:flex; align-items:center; gap:10px; margin:6px 0; } .meter span { width:80px; }
+.meter div { flex:1; height:8px; background:#222633; border-radius:4px; overflow:hidden; }
+.meter i { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--acc),var(--hot)); transition:width .2s; }
+#memory { list-style:none; padding:0; margin:0 0 8px; } #memory li { padding:3px 0; border-bottom:1px dashed var(--line); }
+#memory b { color:var(--fg); } 
+textarea { width:100%; background:#10131a; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px; font:13px system-ui; margin-bottom:8px; }
+#resume { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--card); border:1px solid var(--acc); padding:10px 16px; border-radius:8px; font:14px system-ui; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }

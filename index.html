@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Readsic — OST adaptative</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Readsic <small>prototype A · bande originale à la volée</small></h1>
+  <div class="controls">
+    <button id="start">▶ Lancer l'audio</button>
+    <button id="auto" disabled>Lecture auto : off</button>
+    <label>Vitesse <input id="wpm" type="range" min="80" max="400" value="200"> <span id="wpmv">200</span> mpm</label>
+    <label>Volume <input id="vol" type="range" min="0" max="100" value="70"></label>
+  </div>
+</header>
+
+<main>
+  <section id="reader" aria-label="Texte"></section>
+  <aside>
+    <div class="card">
+      <h2>Lieu courant</h2>
+      <div id="place" class="place">—</div>
+      <div id="valence" class="muted">—</div>
+    </div>
+    <div class="card">
+      <h2>Analyse (fenêtre de 5 phrases)</h2>
+      <div class="meter"><span>Tension</span><div><i id="m-tension"></i></div></div>
+      <div class="meter"><span>Mouvement</span><div><i id="m-move"></i></div></div>
+    </div>
+    <div class="card">
+      <h2>Mémoire des lieux</h2>
+      <ul id="memory" class="muted"></ul>
+      <button id="clear" class="ghost">Effacer la mémoire</button>
+    </div>
+    <div class="card">
+      <h2>Votre texte</h2>
+      <textarea id="custom" rows="5" placeholder="Collez un texte (lieux reconnus : marécage, taverne, forêt, cité, mer, château, grotte)…"></textarea>
+      <button id="load" class="ghost">Charger ce texte</button>
+    </div>
+  </aside>
+</main>
+<div id="resume" hidden></div>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
