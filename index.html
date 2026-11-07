@@ -31,6 +31,12 @@
       <div class="legend"><span><i style="background:#e0a84a"></i>mots-clés</span><span><i style="background:#5aa9e6"></i>LLM</span></div>
       <h2 style="margin-top:12px">Désaccords <label class="muted"><input type="checkbox" id="cmp-all"> tout afficher</label></h2>
       <div id="cmp-verdict" class="muted"></div>
+      <div class="cmp-actions">
+        <button id="cmp-export" class="ghost">Exporter les votes (JSON)</button>
+        <button id="cmp-tune" class="ghost">Suggérer des mots pour les lexiques</button>
+        <label class="muted">support min <input type="number" id="cmp-minsup" value="2" min="1" max="5"></label>
+      </div>
+      <div id="cmp-tuning" hidden></div>
       <table id="cmp-table"></table>
     </section>
     <section id="reader" aria-label="Texte"></section>

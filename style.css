@@ -50,4 +50,9 @@ select { background:#10131a; color:var(--fg); border:1px solid var(--line); bord
 #cmp-table .txt { max-width:260px; color:#b9b6ae; font:12px Georgia, serif; }
 #cmp-table .num { white-space:nowrap; color:var(--mut); font-size:.75rem; }
 #cmp-table button { padding:2px 7px; font-size:11px; margin-right:2px; } #cmp-table button.on { outline:2px solid var(--fg); }
+.cmp-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+.cmp-actions input[type=number] { width:3.2em; background:#10131a; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:3px 4px; }
+#cmp-tuning { background:#10131a; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:8px; }
+#cmp-tuning ul { list-style:none; margin:6px 0; padding:0; } #cmp-tuning li { padding:2px 0; }
+#cmp-tuning code { color:var(--acc); }
 @media (max-width: 800px) { main { grid-template-columns: 1fr; } }

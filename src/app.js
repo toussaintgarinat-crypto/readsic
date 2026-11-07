@@ -6,12 +6,18 @@ import { Memory, hashText } from './memory.js';
 import { LlmScores } from './llm-analyzer.js';
 import { buildStoryboard } from './storyboard.js';
 import { compareAnalyses, tally } from './compare.js';
-import { detectPlace } from './analyzer.js';
+import { detectPlace, setLexicon, mergeOverrides, getLexiconOverrides } from './analyzer.js';
+import { suggestLexicon, toOverrides, evaluateOverrides } from './lexicon-tuning.js';
+import { EXTRA } from './lexicon-extra.js';
 import { SAMPLE_TEXT } from './sample.js';
 
 const $ = (id) => document.getElementById(id);
 const PHASE_LABEL = { intro: 'introduction', developpement: 'développement', paroxysme: 'paroxysme', resolution: 'résolution' };
 const PHASE_COLOR = { intro: '#4f6d8f', developpement: '#8f7a3a', paroxysme: '#b4443f', resolution: '#4f8f6a' };
+
+const LEX_KEY = 'readsic.lexicon.v1';
+const localOverrides = () => { try { return JSON.parse(localStorage.getItem(LEX_KEY) ?? '{}'); } catch { return {}; } };
+setLexicon(mergeOverrides(EXTRA, localOverrides())); // ajustements de lexique (fichier + navigateur)
 
 const engine = new MusicEngine();
 let text, sentences, spans, memory, current = 0, auto = false, autoTimer = null;
@@ -184,6 +190,61 @@ const f2 = (x) => (x === null ? '—' : x.toFixed(2));
 const prefKey = () => `readsic.cmp.v1.${hashText(text)}.${llmInfo?.provider}.${llmInfo?.model}`;
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(prefKey()) ?? '{}'); } catch { return {}; } };
 let cmpAll = false;
+let voteRows = [];
+
+const download = (name, obj) => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+function exportVotes() {
+  download(`readsic-votes-${hashText(text)}.json`, {
+    version: 1, exportedAt: new Date().toISOString(), textId: hashText(text), provider: llmInfo?.provider, model: llmInfo?.model, rows: voteRows,
+  });
+}
+
+function renderTuning() {
+  const box = $('cmp-tuning'), minSupport = Math.max(1, Number($('cmp-minsup').value) || 2);
+  const sug = suggestLexicon(voteRows, { minSupport });
+  const items = [...sug.add.map((s) => ({ ...s, kind: 'add' })), ...sug.remove.map((s) => ({ ...s, kind: 'remove' }))];
+  box.hidden = false; box.innerHTML = '';
+  const votesLlm = voteRows.filter((r) => r.vote === 'llm').length;
+  if (!items.length) {
+    box.textContent = votesLlm
+      ? `Rien d'assez étayé avec ${votesLlm} vote(s) « LLM » : il faut au moins ${minSupport} phrases où le même mot explique l'erreur. Votez sur plus de phrases ou baissez le support minimum.`
+      : 'Votez « LLM » sur les phrases où il a raison contre les mots-clés : ce sont elles qui permettent de déduire des mots.';
+    return;
+  }
+  const head = document.createElement('div'); head.className = 'muted';
+  head.textContent = `Propositions déduites de ${votesLlm} vote(s) « LLM » — décochez ce qui vous paraît faux :`;
+  const ul = document.createElement('ul'), evalDiv = document.createElement('div'); evalDiv.className = 'muted';
+  const checks = items.map((it) => {
+    const li = document.createElement('li'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true;
+    const ex = it.rows.slice(0, 2).map((i) => `« ${sentences[i].slice(0, 40)}… »`).join(', ');
+    li.append(cb, ` ${it.kind === 'add' ? '+ ajouter' : '− retirer'} `);
+    const code = document.createElement('code'); code.textContent = it.stem; li.append(code, ` → ${it.cat} (${it.support} phrases : ${ex})`);
+    cb.onchange = refresh; ul.appendChild(li); return { cb, it };
+  });
+  const selected = () => toOverrides({ add: checks.filter((c) => c.cb.checked && c.it.kind === 'add').map((c) => c.it), remove: checks.filter((c) => c.cb.checked && c.it.kind === 'remove').map((c) => c.it) });
+  function refresh() {
+    const ev = evaluateOverrides(voteRows, selected());
+    const f = (x) => (x === null ? '—' : x.toFixed(2)), p = (x) => (x === null ? '—' : `${Math.round(x * 100)} %`);
+    const line = (k, l) => `${l} (n=${ev.before[k].n}) : écart de tension ${f(ev.before[k].tensionMAE)} → ${f(ev.after[k].tensionMAE)}, valence identique ${p(ev.before[k].valenceAgree)} → ${p(ev.after[k].valenceAgree)}`;
+    evalDiv.innerHTML = '';
+    for (const [k, l] of [['voted', 'Phrases votées, optimiste car elles ont servi à ajuster'], ['held', 'Autres phrases, contrôle hors échantillon']]) { const d = document.createElement('div'); d.textContent = line(k, l); evalDiv.appendChild(d); }
+  }
+  refresh();
+  const bar = document.createElement('div'); bar.className = 'cmp-actions';
+  const btn = (label, fn) => { const b = document.createElement('button'); b.className = 'ghost'; b.textContent = label; b.onclick = fn; bar.appendChild(b); };
+  btn('Appliquer dans ce navigateur', () => { localStorage.setItem(LEX_KEY, JSON.stringify(mergeOverrides(localOverrides(), selected()))); setLexicon(mergeOverrides(EXTRA, localOverrides())); renderCompare(); });
+  btn('Télécharger le patch (JSON)', () => download('readsic-lexicon-patch.json', selected()));
+  btn('Réinitialiser les ajustements', () => { localStorage.removeItem(LEX_KEY); setLexicon(EXTRA); renderCompare(); });
+  box.append(head, ul, evalDiv, bar);
+  const note = document.createElement('div'); note.className = 'muted';
+  note.textContent = 'Pour les inscrire dans le dépôt : exporter les votes puis `node scripts/tune-lexicon.mjs votes.json --write`.';
+  box.appendChild(note);
+}
 
 async function openCompare() {
   const btn = $('compare-btn');
@@ -202,6 +263,7 @@ function renderCompare() {
     const s = cmpLlm.scores[i]; return s ? { tension: s.tension, valence: s.valence, movement: s.movement, place: s.place } : null;
   });
   const prefs = loadPrefs();
+  voteRows = rows.map((r) => ({ i: r.i, sentence: sentences[r.i], lex: r.lex, llm: r.llm, vote: prefs[r.i] ?? null }));
   $('cmp-model').textContent = llmInfo ? `— ${llmInfo.provider} / ${llmInfo.model}` : '';
   const cell = (v, l) => `<div><b>${v}</b><span>${l}</span></div>`;
   $('cmp-summary').innerHTML =
@@ -333,6 +395,8 @@ $('source').onchange = (e) => setSource(e.target.value);
 $('mode').onchange = (e) => { mode = e.target.value; goTo(current, true); };
 $('compose').onclick = () => compose();
 $('compare-btn').onclick = () => openCompare();
+$('cmp-export').onclick = () => exportVotes();
+$('cmp-tune').onclick = () => renderTuning();
 $('cmp-all').onchange = (e) => { cmpAll = e.target.checked; renderCompare(); };
 $('sb-svg').onclick = (e) => {
   if (!sb) return;
@@ -354,4 +418,4 @@ LlmScores.available().then((h) => {
   if (h.llm) $('source').options[1].textContent = `LLM : ${h.provider} / ${h.model}`;
   $('llm-status').textContent = h.llm ? `Analyse LLM disponible (${h.provider})` : 'Analyse LLM indisponible — configurer un fournisseur (voir README)';
 });
-window.__readsic = { openCompare, engine, goTo, get memory() { return memory; }, get sb() { return sb; }, compose, setSource, get llm() { return llm; } }; // debug/tests
+window.__readsic = { openCompare, getLexiconOverrides, engine, goTo, get memory() { return memory; }, get sb() { return sb; }, compose, setSource, get llm() { return llm; } }; // debug/tests

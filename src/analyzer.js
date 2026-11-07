@@ -3,6 +3,7 @@
 //   analyzeWindow(sentences, i) -> { tension: 0..1, valence, movement: 0..1 }
 
 import { PLACES, DEFAULT_PLACE } from './places.js';
+import { EXTRA } from './lexicon-extra.js';
 
 const strip = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -29,6 +30,36 @@ const LEX = {
   statique: ['immobile', 'silence', 'attend', 'contempl', 'lentement', 'regarda', 'assis', 'songe', 'medit', 'dormi',
     'repos', 'pause', 'wait', 'still', 'stood'],
 };
+
+// Lexiques de base conservés à part : les ajustements (EXTRA + votes) se superposent sans les altérer.
+const BASE_LEX = structuredClone(LEX);
+let overrides = { add: {}, remove: {} };
+export const LEX_CATEGORIES = Object.keys(BASE_LEX);
+export const getLexiconOverrides = () => overrides;
+export function setLexicon(o = {}) {
+  overrides = { add: o.add ?? {}, remove: o.remove ?? {} };
+  for (const cat of LEX_CATEGORIES) {
+    const rm = new Set(overrides.remove[cat] ?? []);
+    LEX[cat] = [...BASE_LEX[cat].filter((st) => !rm.has(st)), ...(overrides.add[cat] ?? []).filter((st) => !BASE_LEX[cat].includes(st))];
+  }
+}
+export function mergeOverrides(a = {}, b = {}) {
+  const out = { add: {}, remove: {} };
+  for (const k of ['add', 'remove']) for (const o of [a, b]) for (const [cat, list] of Object.entries(o[k] ?? {})) out[k][cat] = [...new Set([...(out[k][cat] ?? []), ...list])];
+  return out;
+}
+export const normalizeWord = (w) => strip(w);
+export const tokenize = (s) => tokens(s);
+// Racines des lexiques qui ont déclenché sur une phrase, par catégorie (pour comprendre / corriger une analyse).
+export function explainSentence(s) {
+  const t = tokens(s), out = {};
+  for (const [cat, stems] of Object.entries(LEX)) {
+    const hit = [...new Set(stems.filter((st) => t.some((w) => w.startsWith(st))))];
+    if (hit.length) out[cat] = hit;
+  }
+  return out;
+}
+setLexicon(EXTRA);
 
 const tokens = (s) => strip(s).match(/[a-z']+/g) ?? [];
 const count = (toks, stems) => toks.reduce((n, t) => n + (stems.some((st) => t.startsWith(st)) ? 1 : 0), 0);

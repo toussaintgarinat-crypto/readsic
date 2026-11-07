@@ -30,6 +30,20 @@ Le bouton « Comparer mots-clés / LLM » (actif dès qu'un fournisseur est conf
 - courbes de tension superposées ;
 - les phrases où les deux analyses divergent le plus (cliquer pour l'écouter), avec un vote **mots-clés / égalité / LLM** par phrase. Les votes sont conservés par texte et par modèle : c'est la mesure à regarder pour choisir un fournisseur, plus que l'accord entre les deux, qui ne dit pas qui a raison.
 
+### Affiner les lexiques avec vos votes (`src/lexicon-tuning.js`)
+
+Les votes « LLM » désignent les phrases où l'heuristique s'est trompée. Le bouton « Suggérer des mots pour les lexiques » en déduit :
+- des **ajouts** : mots absents du lexique qui expliquent une sous-estimation de tension, ou la valence vue par le LLM ;
+- des **retraits** : racines qui ont déclenché à tort (ex. « sang » dans « sang-froid »).
+
+Garde-fous : un mot n'est proposé que s'il explique l'erreur dans au moins N phrases (support minimum, 2 par défaut) et qu'il n'est pas aussi fréquent dans les phrases où les deux analyses s'accordent ; les mots vides sont écartés. L'effet est mesuré avant d'appliquer, séparément sur les phrases votées (optimiste : elles ont servi à ajuster) et sur les autres (contrôle hors échantillon, la vraie mesure). Chaque suggestion se décoche avant application.
+
+- **Appliquer dans ce navigateur** : ajustements conservés dans `localStorage`, réversibles (« Réinitialiser »).
+- **Exporter les votes** (JSON : phrase, analyse mots-clés, analyse LLM, vote) puis, pour les inscrire dans le dépôt :
+  `node scripts/tune-lexicon.mjs votes.json [--min-support 2] --write` met à jour `src/lexicon-extra.js` (relu et versionné comme le reste du code).
+
+Limite : avec peu de votes (quelques phrases), le support minimum filtre presque tout ; l'outil est fait pour être alimenté par plusieurs textes. Il corrige des mots, pas la syntaxe (négations, ironie) : pour cela, le LLM reste nécessaire.
+
 ## Mode 2 — cinématographique (`src/storyboard.js`)
 
 « Composer (analyse globale) » lit tout le texte et construit un plan, phrase par phrase :
