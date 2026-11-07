@@ -20,6 +20,10 @@ const LEX = {
     'nostalg', 'regret', 'deuil', 'vide', 'absence', 'soupir', 'sigh', 'tear', 'lonely', 'rain'],
   menacant: ['ombre', 'menac', 'sang', 'croc', 'tenebre', 'mort', 'lame', 'hurl', 'rampe', 'sinistre', 'cauchemar',
     'putride', 'ricane', 'predateur', 'grondement', 'dread', 'sinister', 'growl'],
+  festif: ['fete', 'festin', 'danse', 'chope', 'violon', 'endiabl', 'tapage', 'ripaille', 'taverne', 'tavernier', 'musique', 'tavern', 'dance'],
+  tragique: ['deuil', 'sacrific', 'agonie', 'funer', 'tombeau', 'adieu', 'destin', 'perit', 'trepas', 'cadavre', 'mourut', 'tomba', 'fatal', 'doomed'],
+  onirique: ['reve', 'songe', 'etoile', 'feerique', 'flott', 'mirage', 'lune', 'lueur', 'enchant', 'magie', 'irreel', 'aerien', 'dream', 'star'],
+  exotique: ['desert', 'orient', 'epice', 'bazar', 'caravane', 'sultan', 'oasis', 'souk', 'flamenc', 'dune', 'minaret', 'turban'],
   action: ['cour', 'bondi', 'fuit', 'fuy', 'galop', 'frappa', 'elanc', 'vite', 'precipit', 'saut', 'soudain', 'jaillit',
     'charg', 'poursuiv', 'combat', 'esquiv', 'run', 'ran', 'jump', 'fast'],
   statique: ['immobile', 'silence', 'attend', 'contempl', 'lentement', 'regarda', 'assis', 'songe', 'medit', 'dormi',
@@ -44,8 +48,12 @@ function scoreSentence(s) {
   );
   const val = {
     joyeux: count(t, LEX.joyeux),
+    festif: count(t, LEX.festif),
     melancolique: count(t, LEX.melancolique),
     menacant: count(t, LEX.menacant),
+    tragique: count(t, LEX.tragique),
+    onirique: count(t, LEX.onirique),
+    exotique: count(t, LEX.exotique),
   };
   const movement = clamp(0.3 + count(t, LEX.action) * 0.3 - count(t, LEX.statique) * 0.2 + bangs * 0.1);
   return { tension, val, movement };
@@ -56,7 +64,7 @@ const WEIGHTS = [1, 0.8, 0.6, 0.45, 0.3]; // phrase courante + 4 en avance (look
 
 export function analyzeWindow(sentences, i, weights = WEIGHTS) {
   let wsum = 0, tAvg = 0, tMax = 0, mAvg = 0;
-  const val = { joyeux: 0, melancolique: 0, menacant: 0 };
+  const val = { joyeux: 0, festif: 0, melancolique: 0, menacant: 0, tragique: 0, onirique: 0, exotique: 0 };
   weights.forEach((w, k) => {
     const s = sentences[i + k];
     if (s === undefined) return;
@@ -71,7 +79,10 @@ export function analyzeWindow(sentences, i, weights = WEIGHTS) {
   // Moyenne lissée + pic anticipé : la musique "voit venir" le danger sans sauter au mot près.
   const tension = clamp(0.6 * (tAvg / wsum) + 0.4 * tMax);
   const [best, score] = Object.entries(val).sort((a, b) => b[1] - a[1])[0];
-  return { tension, valence: score >= 0.6 ? best : 'neutre', movement: clamp(mAvg / wsum) };
+  let valence = score >= 0.6 ? best : 'neutre';
+  // Menace extrême => mode Locrien (« obscurité extrême, instabilité »).
+  if (valence === 'menacant' && tension >= 0.75) valence = 'angoissant';
+  return { tension, valence, movement: clamp(mAvg / wsum) };
 }
 
 export function detectPlace(sentence) {

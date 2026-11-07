@@ -1,14 +1,16 @@
 import { splitSentences, analyzeWindow, placeAt } from './analyzer.js';
-import { PLACES } from './places.js';
+import { PLACES, MODES, VALENCE_MODE, VALENCE_LABEL, keyInfo } from './places.js';
+import { Modulator } from './modulation.js';
 import { MusicEngine } from './engine.js';
 import { Memory, hashText } from './memory.js';
 import { SAMPLE_TEXT } from './sample.js';
 
 const $ = (id) => document.getElementById(id);
-const VAL_LABEL = { joyeux: 'joyeux', melancolique: 'mélancolique', menacant: 'menaçant', neutre: 'neutre' };
 
 const engine = new MusicEngine();
 let text, sentences, spans, memory, current = 0, auto = false, autoTimer = null;
+const modulator = new Modulator();
+let lastMove = null;
 
 function load(t) {
   text = t;
@@ -67,10 +69,14 @@ function goTo(i, jumped = false) {
     // la mémoire du lieu pèse sur la tension : un marécage devenu dangereux le reste un peu
     const tension = Math.max(a.tension, dread * 0.6);
     engine.setTarget({ tension, valence: a.valence, movement: a.movement });
-    if (jumped) engine.cur.tension = tension;
+    if (jumped) { engine.cur.tension = tension; modulator.prevT = tension; modulator.prevV = a.valence; }
+    else {
+      const move = modulator.update({ tension, valence: a.valence });
+      if (move) { engine.modulate(move.offset); lastMove = move; }
+    }
   }
   $('place').textContent = PLACES[placeId].name;
-  $('valence').textContent = `Valence : ${VAL_LABEL[a.valence]}`;
+  renderTheory(placeId, a);
   $('m-tension').style.width = `${Math.round(a.tension * 100)}%`;
   $('m-move').style.width = `${Math.round(a.movement * 100)}%`;
   renderMemory();
@@ -80,8 +86,26 @@ function changePlace(placeId) {
   const prev = engine.placeId;
   if (prev) memory.save(prev, engine.snapshot());
   const mem = memory.enter(placeId);
+  modulator.reset(mem.offset ?? 0); // la tonalité (modulation) du lieu est restaurée avec lui
+  lastMove = null;
   // état mémorisé rechargé instantanément (leitmotif à la bonne position, gamme)
   engine.enterPlace(placeId, mem.motifIdx !== undefined ? mem : null);
+}
+
+const rootPc = (placeId, offset) => PLACES[placeId].pc + offset;
+
+function renderTheory(placeId, a) {
+  const place = PLACES[placeId];
+  const modeId = VALENCE_MODE[a.valence] ?? place.mode;
+  const mode = MODES[modeId];
+  const off = engine.running ? modulator.offset : 0;
+  const k = keyInfo(rootPc(placeId, off), modeId);
+  $('valence').textContent = `Valence : ${VALENCE_LABEL[a.valence]}`;
+  $('theory').innerHTML =
+    `<b>${k.label}</b> · mode ${mode.name.toLowerCase()}<br>` +
+    `<span class="muted">${mode.feel}${k.emotion ? ` — tonalité : ${k.emotion}` : ''}</span>` +
+    (off ? `<br><span class="muted">transposé de ${off > 0 ? '+' : ''}${off} ½ ton (lieu : ${keyInfo(place.pc, place.mode).label})</span>` : '');
+  $('move').textContent = lastMove ? `↝ ${lastMove.label}` : '—';
 }
 
 function renderMemory() {
@@ -90,7 +114,8 @@ function renderMemory() {
   if (!entries.length) { ul.innerHTML = '<li>Aucun lieu visité</li>'; return; }
   for (const [id, p] of entries) {
     const li = document.createElement('li');
-    li.innerHTML = `<b>${PLACES[id].name}</b> — ${p.visits} visite${p.visits > 1 ? 's' : ''}, malaise ${Math.round((p.dread ?? 0) * 100)}%`;
+    const off = p.offset ? `, ${p.offset > 0 ? '+' : ''}${p.offset} ½ ton` : '';
+    li.innerHTML = `<b>${PLACES[id].name}</b> — ${p.visits} visite${p.visits > 1 ? 's' : ''}, malaise ${Math.round((p.dread ?? 0) * 100)}%${off}`;
     ul.appendChild(li);
   }
 }

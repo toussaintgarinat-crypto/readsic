@@ -79,14 +79,18 @@ export class MusicEngine {
   }
 
   // Couche de tension : globale, elle se superpose au thème du lieu au lieu de le remplacer.
+  // Elle construit peu à peu un accord diminué 7 (1, ♭3, ♭5, 𝄫7 — cf. « accords diminués » du Drive) :
+  // tonique -> triton -> tierce mineure -> sixte, au fil de la tension.
   buildTensionLayer() {
     const ctx = this.ctx;
     this.tGain = ctx.createGain(); this.tGain.gain.value = 0;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
-    this.tOscs = [0, 6].map((semi) => {
+    this.tOscs = [0, 6, 3, 9].map((semi, k) => {
       const o = ctx.createOscillator(); o.type = 'sawtooth';
-      o.frequency.value = 65.4 * 2 ** (semi / 12); o.connect(lp); o.start();
-      return { o, semi };
+      o.frequency.value = 65.4 * 2 ** (semi / 12);
+      const g = ctx.createGain(); g.gain.value = 0;
+      o.connect(g).connect(lp); o.start();
+      return { o, g, semi, th: [0, 0.2, 0.5, 0.75][k] };
     });
     // trémolo dont la vitesse augmente avec la tension
     this.lfo = ctx.createOscillator(); this.lfo.frequency.value = 2;
@@ -96,6 +100,32 @@ export class MusicEngine {
     lp.connect(trem).connect(this.tGain);
     this.tGain.connect(this.master);
     this.tGain.connect(this.reverb);
+  }
+
+  rootOf(s) { return s.place.rootHz * 2 ** (s.offset / 12); }
+
+  // Réaccorde drone + couche de tension sur la tonique courante (lieu + modulation), en glissando.
+  retune(s, glide) {
+    const now = this.ctx.currentTime, root = this.rootOf(s);
+    s.drone.forEach(({ o, semi }) => o.frequency.setTargetAtTime(root * 2 ** (semi / 12), now, glide));
+    this.tOscs.forEach(({ o, semi }) => o.frequency.setTargetAtTime(root * 2 ** (semi / 12), now, glide));
+    this.retuneColor(s, glide);
+  }
+
+  // Couleur d'accord du drone : la tierce du mode courant (majeure/mineure selon le mode).
+  retuneColor(s, glide) {
+    const scale = this.scaleOf(s), third = scale[2];
+    s.color.frequency.setTargetAtTime(this.rootOf(s) * 2 ** ((third + 12) / 12), this.ctx.currentTime, glide);
+  }
+
+  modeName(s) { return VALENCE_MODE[this.valence] ?? s.place.mode; }
+  scaleOf(s) { return MODES[this.modeName(s)].iv; }
+
+  // Modulation narrative : décale la tonique du lieu (offset en demi-tons) avec un glissando de ~1,5 s.
+  modulate(offset) {
+    const s = this.scene; if (!s || s.offset === offset) return;
+    s.offset = offset;
+    this.retune(s, 0.6);
   }
 
   // --- Scènes -------------------------------------------------------------
@@ -119,36 +149,42 @@ export class MusicEngine {
     filter.connect(bus); bus.connect(this.master); bus.connect(send); send.connect(this.reverb);
 
     // Nappe de fond propre au lieu : fondamentale + quinte légèrement désaccordées.
+    const offset = snapshot?.offset ?? 0; // tonalité mémorisée (modulation) restaurée à l'identique
+    const root0 = place.rootHz * 2 ** (offset / 12);
     const drone = [0, 7, -12].map((semi, k) => {
       const o = ctx.createOscillator();
       o.type = k === 2 ? 'sine' : 'triangle';
-      o.frequency.value = place.rootHz * 2 ** (semi / 12);
+      o.frequency.value = root0 * 2 ** (semi / 12);
       o.detune.value = (k - 1) * 6;
       const g = ctx.createGain(); g.gain.value = k === 2 ? 0.1 : 0.06;
       o.connect(g).connect(filter); o.start();
-      return o;
+      return { o, semi };
     });
+    // Tierce du mode, une octave au-dessus : donne sa couleur (majeure/mineure) à la nappe.
+    const color = ctx.createOscillator(); color.type = 'sine';
+    const cg = ctx.createGain(); cg.gain.value = 0.035;
+    color.connect(cg).connect(filter); color.start();
 
     const motif = makeMotif(id);
     const scene = {
-      id, place, bus, filter, motif,
+      id, place, bus, filter, motif, drone, color, offset, colorKey: '',
       motifIdx: snapshot?.motifIdx ?? 0,
       rng: mulberry32(seedOf(id) + (snapshot?.motifIdx ?? 0)),
       step: 0,
       nextTime: now + 0.1,
-      dispose() { drone.forEach((o) => { try { o.stop(); } catch { /* déjà arrêté */ } }); bus.disconnect(); filter.disconnect(); send.disconnect(); },
+      dispose() { [...drone.map((d) => d.o), color].forEach((o) => { try { o.stop(); } catch { /* déjà arrêté */ } }); bus.disconnect(); filter.disconnect(); send.disconnect(); },
     };
     this.scene = scene;
     if (snapshot?.valence) this.valence = snapshot.valence; // gamme mémorisée restaurée instantanément
     bus.gain.linearRampToValueAtTime(1, now + FADE);
 
     // la couche de tension suit la tonalité du lieu
-    this.tOscs.forEach(({ o, semi }) => o.frequency.setTargetAtTime(place.rootHz * 2 ** (semi / 12), now, 1));
+    this.retune(scene, 1);
   }
 
   snapshot() {
     const s = this.scene; if (!s) return null;
-    return { motifIdx: s.motifIdx, valence: this.valence, movement: this.cur.movement };
+    return { motifIdx: s.motifIdx, valence: this.valence, movement: this.cur.movement, offset: s.offset };
   }
 
   setTarget(t) { this.target = { ...this.target, ...t }; }
@@ -163,6 +199,9 @@ export class MusicEngine {
 
     const t = this.cur.tension, now = ctx.currentTime;
     this.tGain.gain.setTargetAtTime(0.14 * t ** 1.6, now, 0.5);
+    this.tOscs.forEach(({ g, th }) => g.gain.setTargetAtTime(Math.min(1, Math.max(0, (t - th) / 0.3)), now, 0.5));
+    const key = this.modeName(s) + '|' + s.offset;
+    if (key !== s.colorKey) { s.colorKey = key; this.retuneColor(s, 0.4); }
     this.lfo.frequency.setTargetAtTime(2 + 8 * t, now, 0.5);
     s.filter.frequency.setTargetAtTime(s.place.cutoff * (1 + 1.2 * t), now, 0.5);
 
@@ -179,14 +218,13 @@ export class MusicEngine {
     const { place } = s, t = this.cur.tension, mv = this.cur.movement;
     const prob = Math.min(0.95, place.density * (0.25 + 0.9 * mv));
     if (s.rng() < prob) {
-      const modeName = VALENCE_MODE[this.valence] ?? place.mode;
-      const scale = MODES[modeName];
+      const scale = this.scaleOf(s);
       let deg = s.motif[s.motifIdx % s.motif.length];
       if (s.rng() < 0.15) deg += s.rng() < 0.5 ? -1 : 1; // légère variation
       s.motifIdx++;
       const oct = Math.floor(deg / scale.length);
       const semi = scale[((deg % scale.length) + scale.length) % scale.length] + 12 * oct;
-      const freq = place.rootHz * 2 ** (place.octave - 1) * 2 ** (semi / 12);
+      const freq = this.rootOf(s) * 2 ** (place.octave - 1) * 2 ** (semi / 12);
       const dur = 60 / place.tempo * (1.2 + (1 - mv) * 1.5);
       this.playNote(s, place.instrument, freq, time, dur, 0.16 + 0.1 * t);
     }

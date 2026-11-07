@@ -8,6 +8,8 @@ Elle ne s'arrêta qu'aux lumières de l'auberge. La porte de la taverne claqua d
 
 Elle y resta jusqu'à l'aube, à boire, à rire, à oublier. Mais au fond d'elle, le souvenir de son frère revenait, doux et amer.
 
+Elle s'endormit enfin, et rêva. Dans son rêve, une lune pâle flottait au-dessus d'un désert d'étoiles, et une caravane silencieuse suivait les dunes. Un air venu d'orient, lointain comme un mirage, la berçait.
+
 Au matin, elle reprit le sentier. Elle devait retourner au marécage. La brume était plus épaisse qu'hier, et le silence plus lourd encore. Quelque chose l'attendait là-bas, elle le savait. Les roseaux frémirent. Une lame brilla dans les ténèbres, et une voix glaciale murmura son nom.
 
 « MARA. » Elle tremblait, mais elle ne recula pas. C'était le moment. Elle tira son épée et frappa.
